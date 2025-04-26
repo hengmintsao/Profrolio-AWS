@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portfolio</title>
+  <script src="https://cdn.tailwindcss.com"></script> <!-- Tailwind CSS -->
+  <script src="https://kit.fontawesome.com/73cd64da9f.js" crossorigin="anonymous"></script> <!-- FontAwesome -->
+  <link rel="stylesheet" href="style.css"> <!-- CSS -->
+</head>
+
+<body>
+
+  <!-- Navbar -->
+  <nav>
+    <div class="container">
+      <div class="logo">Hengmin's Portfolio</div>
+      <div class="nav-links">
+        <a href="https://github.com/hengmintsao" target="_blank">
+          <i class="fa-brands fa-github"></i><span>GitHub</span>
+        </a>
+        <a href="https://www.linkedin.com/in/hengmin-tsao-3b3403239/" target="_blank">
+          <i class="fa-brands fa-linkedin"></i> <span>Linkedin</span>
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <main>
+    <!-- Hero Section -->
+    <section class="hero-section">
+      <div class="text">
+        <h2>Welcome to Hengmin's Portfolio!</h2>
+        <p>Showcasing my works and experience. AAAAAAAAAAAAAAAAAAA</p>
+
+        <div class="links">
+          <a href="#skills">
+            <i class="fa-solid fa-code"></i>
+            <span>Skills</span>
+          </a>
+
+          <a href="#projects">
+            <i class="fa-solid fa-pen"></i>
+            <span>Projects</span>
+          </a>
+
+          <a href="#certification">
+            <i class="fa-solid fa-pen"></i>
+            <span>Certifications</span>
+          </a>
+
+          <a href="#contact">
+            <i class="fa-solid fa-envelope"></i>
+            <span>Contact</span>
+          </a>
+        </div>
+      </div>
+      <div class="headshot">
+        <img src="IMG_5241.JPG" alt="john doe headshot">
+      </div>
+    </section>
+
+    <!-- SECTION 2: Skills -->
+    <section id="skills" class="skills-section">
+      <h2>Skills</h2>
+
+      <!-- Software Development -->
+      <h3 class="skills-category">Software Development</h3>
+      <ul class="skills-list">
+        <li><strong>Programming / Languages:</strong> C, C++, JavaScript</li>
+        <li><strong>Database Technology:</strong> Oracle SQL, MongoDB</li>
+        <li><strong>Web Development:</strong> HTML, CSS, React</li>
+        <li><strong>Cloud:</strong> AWS</li>
+      </ul>
+
+      <!-- Aviation field -->
+      <h3 class="skills-category">Aviation field</h3>
+      <ul class="skills-list">
+        <li><strong>Check-in Operation System Concepts:</strong> Amadeus Customer Management (CM), Skyport, iFlyRES,
+          Travelsky</li>
+        <li><strong>Cabin Control, Overbooking Control:</strong> Amadeus 1A Inventory PRD</li>
+        <li><strong>Market Share Report:</strong> Travelport, MIDT</li>
+      </ul>
+    </section>
+
+
+    <!-- Certification -->
+
+    <section id="certification" class="certification-section">
+      <h2 class="certification-category">Certification</h2>
+    
+      <ul class="skills-list">
+    
+        <li>
+          <strong>AWS Certified Cloud Practitioner:</strong> Fundamental understanding of IT services and their uses in the AWS Cloud.
+          <a href="https://www.credly.com/badges/04e370e5-bd92-4625-b01c-5c5a870d5772/linked_in_profile" target="_blank" class="cert-btn">View Certificate</a>
+        </li>
+    
+        <li>
+          <strong>AWS Certified Solutions Architect – Associate:</strong> Earners of this certification have a comprehensive understanding of AWS services and technologies. They demonstrated the ability to build secure and robust solutions using architectural design principles based on customer requirements.
+          <a href="https://www.credly.com/badges/8b3c6297-144b-4ae7-87a5-b271d2d7643a/linked_in_profile" target="_blank" class="cert-btn">View Certificate</a>
+        </li>
+    
+      </ul>
+    </section>
+
+    <!-- Project Section -->
+    <section id="projects" class="projects-section">
+      <div class="section-content">
+        <h2>My Projects</h2>
+        <div class="projects">
+          <div class="project-card">
+            <h3>Airline-Point Website</h3>
+            <p>A platform for airline points enthusiasts. Built with React and AWS.</p>
+          </div>
+          <div class="project-card">
+            <h3>Portfolio Website</h3>
+            <p>This portfolio showcasing my projects, built with HTML, CSS, and JavaScript.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section id="contact" class="contact-section">
+      <h2>Contact Me</h2>
+      <div class="group">
+        <div class="text">
+          <p>Feel free to reach out to me using the form below!</p>
+        </div>
+        <form>
+          <input type="text" id="firstname" placeholder="First Name" required>
+          <input type="text" id="lastname" placeholder="Last Name" required>
+          <input type="email" id="email" placeholder="Email" required>
+          <input type="tel" id="phone" placeholder="Phone" required>
+          <textarea id="description" placeholder="Message" rows="4" required></textarea>
+          <button type="submit">Submit</button>
+        </form>
+      </div>
+    </section>
+  </main>
+
+</body>
+
+</html>
