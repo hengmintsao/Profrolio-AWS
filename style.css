@@ -1,7 +1,7 @@
 :root {
     --text-color: #1a1c20;
     --link-color: #4a76ee;
-    --background-color: #eeeff1;
+    --background-color: #ffffff;
   }
   
   * {
@@ -18,9 +18,11 @@
     font-family: 'Poppins', sans-serif;
     color: var(--text-color);
     background-color: var(--background-color);
-    max-width: 1400px;
-    margin: 0 auto;
+    width: 100%;
+    margin: 0;
+    padding: 0 20px;
   }
+  
   
   a {
     color: var(--link-color);
@@ -32,7 +34,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-  
+    font-size: large;
     padding: 0 50px;
     height: 80px;
   }
@@ -121,7 +123,6 @@
   }
   
   .skills-section h2 {
-    text-align: center;
     font-size: 35px;
   }
 
@@ -189,7 +190,6 @@
   }
 
   .certification-section h2 {
-    text-align: center;
     font-size: 35px;
   }
 
@@ -198,6 +198,13 @@
   }
   
   /* SECTION 3: Projects */
+
+  .projects-section {
+    padding: 0 50px;
+    margin-top: 80px;
+    margin-bottom: 100px;
+  }
+
   .projects-section .projects {
     display: flex;
     flex-wrap: wrap;
@@ -207,8 +214,8 @@
   }
 
   .projects-section h2 {
-    text-align: center;
     font-size: 35px;
+    margin-bottom: 1rem;
   }
   
   .projects-section .project-card {
@@ -282,83 +289,79 @@
     filter: brightness(.9);
   }
   
-  @media (max-width: 850px) {
-    /* SECTION 1: Hero */
+  @media (max-width: 1280px) {
+    body {
+      max-width: 1100px;
+    }
+  
+    nav {
+      padding: 0 30px;
+    }
+  
+    .hero-section, 
+    .skills-section,
+    .certification-section,
+    .projects-section,
+    .contact-section {
+      padding: 0 30px;
+    }
+  
     .hero-section .text h2 {
-      font-size: 35px;
+      font-size: 40px;
+    }
+  
+    .skills-section .skills-list li,
+    .certification-section .skills-list li {
+      font-size: 16px;
     }
   }
   
-  @media (max-width: 740px) {
-    /* SECTION 1: Hero */
+  @media (max-width: 850px) {
     .hero-section {
       flex-direction: column-reverse;
-    }
-  
-    .hero-section .headshot img {
-      width: 300px;
-    }
-  
-    /* SECTION 3: Projects */
-    .projects-section {
       text-align: center;
     }
   
-    .projects-section .group {
-      flex-direction: column;
+    .hero-section .headshot {
+      justify-content: center;
     }
   
-    /* SECTION 4: Contact */
-    .contact-section .group {
-      flex-direction: column;
+    .hero-section .headshot img {
+      width: 250px;
+    }
+  
+    nav .nav-links span {
+      display: none;
     }
   }
   
   @media (max-width: 600px) {
-    /* NAVBAR */
+    body {
+      padding: 0 15px;
+    }
+  
     nav {
-      padding: 0 20px;
-    }
-  
-    nav .right a {
-      font-size: 22px;
-    }
-  
-    nav .right a:last-child {
-      color: var(--text-color);
-      background-color: transparent;
-      padding: 0;
-    }
-  
-    nav .right a span {
-      display: none;
-    }
-  
-    /* SECTION 1: Hero */
-    .hero-section {
-      padding: 0 20px;
+      padding: 0 15px;
     }
   
     .hero-section .text h2 {
+      font-size: 28px;
+    }
+  
+    .skills-section h2,
+    .certification-section h2,
+    .projects-section h2,
+    .contact-section h2 {
       font-size: 30px;
     }
   
-    /* SECTION 2: Skills */
-    .skills-section {
-      padding: 0 20px;
+    .skills-section .skills-list li,
+    .certification-section .skills-list li {
+      font-size: 14px;
     }
   
-    .skills-section .cells .cell span {
-      font-size: 16px;
-    }
-  
-    /* SECTION 3: Projects */
-    .projects-section {
-      padding: 0 20px;
-    }
-  
-    /* SECTION 4: Contact */
-    .contact-section {
-      padding: 0 20px;
+    .cert-btn {
+      padding: 3px 8px;
+      font-size: 12px;
     }
   }

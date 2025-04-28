@@ -5,7 +5,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Portfolio</title>
-  <script src="https://cdn.tailwindcss.com"></script> <!-- Tailwind CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" /> <!--DaisyUI-->
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script> <!--DaisyUI-->
   <script src="https://kit.fontawesome.com/73cd64da9f.js" crossorigin="anonymous"></script> <!-- FontAwesome -->
   <link rel="stylesheet" href="style.css"> <!-- CSS -->
 </head>
@@ -32,8 +33,18 @@
     <section class="hero-section">
       <div class="text">
         <h2>Welcome to Hengmin's Portfolio!</h2>
-        <p>Showcasing my works and experience. AAAAAAAAAAAAAAAAAAA</p>
-
+        <p>With over 6.5 years of experience in the aviation industry, 
+          from airport ground handling check-in service to sales and revenue analysis. 
+          From customer service to price management and cabin control. This diverse experience has equipped me with a deep understanding of operational dynamics
+          , strategic pricing, and customer service excellence.
+        </p>
+        <br />
+        <p>I have built a solid foundation in modern software development.
+          I’m comfortable across the full stack, designing responsive interfaces with HTML / CSS / JavaScript (React), crafting resilient back-end services with Node.js / Express, modelling data in SQL and MongoDB.
+          beyond that, I leverage Amazon Web Services to provision secure, scalable cloud infrastructure.
+          </p>
+          <br />
+          <p>This blend of aviation domain insight and engineering skill lets me translate real-world operational challenges into elegant, high-impact digital products.</p>
         <div class="links">
           <a href="#skills">
             <i class="fa-solid fa-code"></i>
@@ -57,7 +68,7 @@
         </div>
       </div>
       <div class="headshot">
-        <img src="IMG_5241.JPG" alt="john doe headshot">
+        <img src="myPhoto.jpg" alt="Hengmin headshot">
       </div>
     </section>
 
@@ -75,7 +86,7 @@
       </ul>
 
       <!-- Aviation field -->
-      <h3 class="skills-category">Aviation field</h3>
+      <h3 class="skills-category">Aviation Expertise</h3>
       <ul class="skills-list">
         <li><strong>Check-in Operation System Concepts:</strong> Amadeus Customer Management (CM), Skyport, iFlyRES,
           Travelsky</li>
@@ -105,23 +116,49 @@
       </ul>
     </section>
 
-    <!-- Project Section -->
-    <section id="projects" class="projects-section">
-      <div class="section-content">
+    <section id="projects" class="projects-section py-12">
         <h2>My Projects</h2>
-        <div class="projects">
-          <div class="project-card">
-            <h3>Airline-Point Website</h3>
-            <p>A platform for airline points enthusiasts. Built with React and AWS.</p>
+        <div class="flex flex-wrap gap-8">
+    
+          <!-- Card 1 -->
+          <div class="card w-[350px] bg-base-100 shadow-lg rounded-lg">
+            <div class="relative group overflow-hidden rounded-t-lg">
+              <img src="Airline-point-website.png" alt="Airline-Point Website" class="h-48 w-full object-cover" />
+              <a href="https://airline-point-website.vercel.app" target="_blank"
+                 class="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition duration-300">
+                <i class="fa-solid fa-up-right-from-square text-white text-4xl"></i>
+              </a>
+            </div>
+            <div class="card-body">
+              <h3 class="card-title">Airline-Point Website</h3>
+              <p class="text-sm text-left">Skilled use: React, Express.js, MongoDB, Cypress</p>
+              <p class="text-sm mb-4 text-left">
+                This is a website that provides an easy way to check the average cost of earning miles when purchasing tickets. 
+              </p>
+            </div>
           </div>
-          <div class="project-card">
-            <h3>Portfolio Website</h3>
-            <p>This portfolio showcasing my projects, built with HTML, CSS, and JavaScript.</p>
+    
+          <!-- Card 2 -->
+          <div class="card w-[350px] bg-base-100 shadow-lg rounded-lg">
+            <div class="relative group overflow-hidden rounded-t-lg">
+              <img src="https://via.placeholder.com/400x250" alt="Portfolio Website" class="h-48 w-full object-cover" />
+              <a href="https://your-portfolio-link.com" target="_blank"
+                 class="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition duration-300">
+                <i class="fa-solid fa-up-right-from-square text-white text-4xl"></i>
+              </a>
+            </div>
+            <div class="card-body">
+              <h3 class="card-title">Portfolio Website</h3>
+              <p class="text-sm text-left">Skilled use: HTML, CSS, JavaScript, AWS</p>
+              <p class="text-sm mb-4 text-left">
+                This portfolio showcases my projects, built with static html, deploying on AWS.
+              </p>
+            </div>
           </div>
+    
         </div>
-      </div>
     </section>
-
+    
     <!-- Contact Section -->
     <section id="contact" class="contact-section">
       <h2>Contact Me</h2>
@@ -130,11 +167,10 @@
           <p>Feel free to reach out to me using the form below!</p>
         </div>
         <form>
-          <input type="text" id="firstname" placeholder="First Name" required>
-          <input type="text" id="lastname" placeholder="Last Name" required>
-          <input type="email" id="email" placeholder="Email" required>
-          <input type="tel" id="phone" placeholder="Phone" required>
-          <textarea id="description" placeholder="Message" rows="4" required></textarea>
+          <input type="text" id="Name" placeholder="Name(Required)" required>
+          <input type="email" id="email" placeholder="Email(Required)" required>
+          <input type="tel" id="phone" placeholder="Phone(Optional)">
+          <textarea id="description" class="field-sizing-content" placeholder="Message(Optional)" rows="4"></textarea>
           <button type="submit">Submit</button>
         </form>
       </div>
