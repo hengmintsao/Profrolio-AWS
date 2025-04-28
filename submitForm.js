@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', function () {
       };
   
       try {
-        const response = await fetch('https://630j7mj8l9.execute-api.us-east-1.amazonaws.com/default/saveForm', {
+        const response = await fetch('https://630j7mj8l9.execute-api.us-east-1.amazonaws.com/production/saveForm', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
