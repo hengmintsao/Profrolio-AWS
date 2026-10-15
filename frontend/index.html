@@ -8,7 +8,7 @@
   <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" /> <!--DaisyUI-->
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script> <!--DaisyUI-->
   <script src="https://kit.fontawesome.com/73cd64da9f.js" crossorigin="anonymous"></script> <!-- FontAwesome -->
-  <link rel="stylesheet" href="style.css"> <!-- CSS -->
+  <link rel="stylesheet" href="css/style.css"> <!-- CSS -->
 </head>
 
 <body>
@@ -71,7 +71,7 @@
         </div>
       </div>
       <div class="headshot">
-        <img src="myPhoto.jpg" alt="Hengmin headshot">
+        <img src="assets/images/myPhoto.jpg" alt="Hengmin headshot">
       </div>
     </section>
 
@@ -133,7 +133,7 @@
         <!-- Card 1 -->
         <div class="card h-[450px] w-[350px] bg-base-100 shadow-lg rounded-lg">
           <div class="relative group overflow-hidden rounded-t-lg">
-            <img src="Airline-point-website.png" alt="Airline-Point Website" class="h-66 w-full object-cover" />
+            <img src="assets/images/airline-point-website.png" alt="Airline-Point Website" class="h-66 w-full object-cover" />
             <a href="https://airline-point-website.vercel.app" target="_blank"
               class="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition duration-300">
               <i class="fa-solid fa-up-right-from-square text-white text-4xl"></i>
@@ -153,7 +153,7 @@
         <!-- Card 2 -->
         <div class="card h-[450px] w-[350px] bg-base-100 shadow-lg rounded-lg">
           <div class="relative group overflow-hidden rounded-t-lg">
-            <img src="portfrolio.png" alt="Portfolio Website" class="h-66 w-full object-cover" />
+            <img src="assets/images/portfolio.png" alt="Portfolio Website" class="h-66 w-full object-cover" />
             <a href="http://profrolio-aws.s3-website-us-east-1.amazonaws.com/" target="_blank"
               class="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition duration-300">
               <i class="fa-solid fa-up-right-from-square text-white text-4xl"></i>
@@ -162,7 +162,7 @@
           <div class="card-body">
             <h3 class="card-title">Portfolio Website</h3>
             <p class="text-sm text-left">Skilled use: HTML, CSS, JavaScript, AWS</p>
-            <p class="text-sm text-left">Feature: Static html(On AWS S3), Lambda, DynamoDB</p>
+            <p class="text-sm text-left">Feature: Static html(On AWS S3), API Gateway + Lambda, DynamoDB, SNS</p>
             <p class="text-sm mb-4 text-left">
               This portfolio showcases my projects, built with static html(responsive design), deploying on AWS.
             </p>
@@ -179,19 +179,22 @@
         <div class="text">
           <p>Feel free to reach out to me using the form below!</p>
         </div>
-        <form>
+        <form id="contact-form">
           <input type="text" id="Name" placeholder="Name(Required)" required>
           <input type="email" id="email" placeholder="Email(Required)" required>
           <input type="tel" id="phone" placeholder="Phone(Optional)">
           <textarea id="description" class="field-sizing-content" placeholder="Message(Optional)" rows="4"></textarea>
+          <input type="text" id="website" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" class="honeypot">
           <button type="submit">Submit</button>
+          <p id="form-status" role="status" aria-live="polite"></p>
         </form>
       </div>
     </section>
   </main>
 
   <!-- submit Form script-->
-  <script src="submitForm.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/submitForm.js"></script>
 </body>
 
 </html>

@@ -1,51 +1,94 @@
-# Profrolio-AWS
-This is a portfolio website built with HTML, CSS, and JavaScript, and deployed on AWS.
+# Portfolio AWS
 
-### How does this work?
-This is my personal portfolio project. However, this time the main focus is on leveraging various AWS cloud services to achieve the deployment and integration. Through this project, I aim to not only showcase my previous works but also demonstrate my ability to utilize AWS for hosting static websites, using S3, API Gateway, Lambda, DynamoDB and Simple Notification Service(SNS).
+A serverless portfolio website that demonstrates frontend development, infrastructure as code, automated delivery, and AWS security practices.
 
+## Architecture
 
-### Concept Map Flowchart
-![Flowchart](https://github.com/user-attachments/assets/9c2f15eb-7a09-49a1-95c4-6137d97106db)
+The frontend is delivered through CloudFront from a private S3 bucket. Contact requests pass through an API Gateway HTTP API to Lambda, which validates and stores the submission in DynamoDB and publishes an SNS notification.
 
-### Feature Accomplishment
+See [the architecture notes](docs/architecture.md) for the data flow and design decisions.
 
-- **Responsive design**
-  The layout automatically adapts to the user’s screen size, delivering an optimal and seamless UI experience on any device.
+## Repository structure
 
-- **Pure static front-end**
-  Hosted on S3, no web servers to patch or scale.
-  
-- **Elastic serverless back-end**
-  HTTP API + Lambda scales on demand with zero idle cost, handling traffic spikes automatically.
-  
-- **Near-zero running cost**
-  Only pay for the tiny Lambda execution time; the rest is usage-based and free at low traffic.
+```text
+frontend/        Static website and runtime configuration
+backend/         Contact Lambda, validation, and unit tests
+infrastructure/  AWS SAM / CloudFormation template
+docs/            Architecture documentation
+.github/         CI and AWS deployment workflows
+```
 
-- **Instant email alerts**
-  Each submission triggers an SNS publish, this feature can instantly send and e-mail to me if there is a submit form triggered.
+## AWS services
 
-  Contact form submitted:
-  ![contactFormSubmitted](https://github.com/user-attachments/assets/76d34575-3700-4c7c-9887-c44d17e5d1f2)
-
-  Publish an Email to my email address:
-  ![publishEmail](https://github.com/user-attachments/assets/302a78ac-f9d8-4813-ae09-74d3cbee4e33)
-
-
-### Tech Stack
-***Front End***
-- Html
-- Tailwind / DaisyUI
-- JavaScript
-
-***Back-End***
-- AWS API Gateway + Lambda
-
-***Database***
+- Amazon CloudFront
+- Amazon S3 with Block Public Access and Origin Access Control
+- Amazon API Gateway HTTP API
+- AWS Lambda
 - Amazon DynamoDB
-
-***Messaging***
 - Amazon SNS
+- Amazon CloudWatch
+- AWS CloudFormation through AWS SAM
 
-***Hosting / Cloud***
-- AWS
+## Local development
+
+Serve `frontend/` with any static HTTP server. The checked-in `frontend/js/config.js` intentionally contains an empty API URL, so local development does not send messages to production by accident.
+
+Run the backend checks:
+
+```bash
+cd backend
+npm install
+npm run check
+npm test
+```
+
+To test the form against an already deployed API, temporarily set `API_URL` in `frontend/js/config.js`. Do not commit environment-specific URLs.
+
+## Deploy with AWS SAM
+
+Prerequisites:
+
+- AWS CLI configured for the target account
+- AWS SAM CLI
+- Node.js 22
+
+```bash
+cd backend
+npm install
+cd ..
+sam build --template-file infrastructure/template.yaml
+sam deploy --guided
+```
+
+Use the generated `ApiEndpoint` stack output to update `frontend/js/config.js`, then upload `frontend/` to the `FrontendBucketName` output and invalidate the `DistributionId` output. The GitHub deployment workflow performs these steps automatically.
+
+If `NotificationEmail` is supplied, AWS sends a subscription confirmation message. Notifications do not begin until that link is confirmed.
+
+After the first deployment, redeploy with `AllowedOrigin` set to the exact CloudFront or custom-domain origin instead of `*`.
+
+## GitHub Actions deployment
+
+Configure these repository settings:
+
+| Type | Name | Purpose |
+|---|---|---|
+| Secret | `AWS_ROLE_ARN` | IAM role trusted by GitHub OIDC |
+| Secret | `NOTIFICATION_EMAIL` | SNS notification recipient |
+| Variable | `AWS_REGION` | Deployment region, defaults to `us-east-1` |
+| Variable | `SAM_STACK_NAME` | CloudFormation stack name, defaults to `portfolio-aws` |
+| Variable | `ALLOWED_ORIGIN` | Exact production HTTPS origin after initial deployment |
+
+The deployment role should be restricted to this repository and production environment. Do not store AWS access keys in GitHub.
+
+## Data and security
+
+- Contact records expire after 90 days through DynamoDB TTL.
+- DynamoDB point-in-time recovery and encryption are enabled.
+- S3 public access is blocked; CloudFront reads through signed Origin Access Control requests.
+- API throttling and a honeypot reduce basic abuse. Add CAPTCHA or AWS WAF if traffic warrants it.
+- CloudWatch logs expire after 30 days.
+- The stack retains the S3 bucket and DynamoDB table when the stack is deleted to prevent accidental data loss.
+
+## Cost
+
+The system uses usage-based serverless services and should remain inexpensive at portfolio traffic levels. It is not strictly zero-cost: CloudFront requests and transfer, S3 storage, API calls, logs, and other usage can incur charges.

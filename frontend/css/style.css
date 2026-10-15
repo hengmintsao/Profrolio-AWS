@@ -318,6 +318,24 @@
     filter: brightness(.9);
   }
 
+  .contact-section .group form button:disabled {
+    cursor: wait;
+    opacity: .65;
+  }
+
+  .honeypot {
+    position: absolute;
+    left: -10000px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+  }
+
+  #form-status {
+    min-height: 1.5rem;
+    margin-top: 10px;
+  }
+
   .connect-image {
     width: 150px;
     height: auto;
