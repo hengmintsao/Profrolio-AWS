@@ -62,6 +62,14 @@ Resources:
             TableName: !Ref ContactTable
         - SNSPublishMessagePolicy:
             TopicName: !GetAtt ContactTopic.TopicName
+        - Statement:
+            - Effect: Allow
+              Action: [kms:GenerateDataKey, kms:Decrypt]
+              Resource: !Sub arn:${AWS::Partition}:kms:${AWS::Region}:${AWS::AccountId}:key/*
+              Condition:
+                StringEquals:
+                  kms:ViaService: !Sub sns.${AWS::Region}.${AWS::URLSuffix}
+                  kms:EncryptionContext:aws:sns:topicArn: !Ref ContactTopic
 
   ContactFunctionLogGroup:
     Type: AWS::Logs::LogGroup
