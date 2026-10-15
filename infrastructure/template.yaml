@@ -38,6 +38,7 @@ Resources:
           - !Ref AllowedOrigin
         AllowHeaders:
           - content-type
+          - idempotency-key
         AllowMethods:
           - POST
       DefaultRouteSettings:
@@ -60,6 +61,39 @@ Resources:
       Policies:
         - DynamoDBWritePolicy:
             TableName: !Ref ContactTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref ContactTable
+
+  ContactNotificationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../backend/
+      Handler: src/notification.handler
+      Description: Retries notifications independently of contact acceptance.
+      Events:
+        StoredContact:
+          Type: DynamoDB
+          Properties:
+            Stream: !GetAtt ContactTable.StreamArn
+            StartingPosition: TRIM_HORIZON
+            BatchSize: 1
+            MaximumRetryAttempts: 10
+            MaximumRecordAgeInSeconds: 3600
+            FunctionResponseTypes: [ReportBatchItemFailures]
+            FilterCriteria:
+              Filters:
+                - Pattern: '{"eventName":["INSERT"]}'
+            DestinationConfig:
+              OnFailure:
+                Type: SQS
+                Destination: !GetAtt NotificationFailureQueue.Arn
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref ContactTable
+        - DynamoDBWritePolicy:
+            TableName: !Ref ContactTable
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt NotificationFailureQueue.QueueName
         - SNSPublishMessagePolicy:
             TopicName: !GetAtt ContactTopic.TopicName
         - Statement:
@@ -70,6 +104,34 @@ Resources:
                 StringEquals:
                   kms:ViaService: !Sub sns.${AWS::Region}.${AWS::URLSuffix}
                   kms:EncryptionContext:aws:sns:topicArn: !Ref ContactTopic
+
+  NotificationFailureQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      MessageRetentionPeriod: 1209600
+      SqsManagedSseEnabled: true
+
+  ContactNotificationLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${ContactNotificationFunction}
+      RetentionInDays: 30
+
+  NotificationFailureAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Contact notification retries exhausted; inspect pending contacts and worker logs.
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt NotificationFailureQueue.QueueName
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
 
   ContactFunctionLogGroup:
     Type: AWS::Logs::LogGroup
@@ -99,6 +161,8 @@ Resources:
     UpdateReplacePolicy: Retain
     Properties:
       BillingMode: PAY_PER_REQUEST
+      StreamSpecification:
+        StreamViewType: NEW_IMAGE
       AttributeDefinitions:
         - AttributeName: id
           AttributeType: S

@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHandler } from '../src/handler.js';
+import { createStoreContact } from '../src/storage.js';
 
 const event = { body: JSON.stringify({ name: ' Henry ', email: 'HENRY@example.com', message: 'Hello' }) };
 
-function setup({ storageFails = false, notificationFails = false } = {}) {
+function setup({ storageFails = false } = {}) {
   const stored = [];
   const notified = [];
   const errors = [];
@@ -13,17 +14,12 @@ function setup({ storageFails = false, notificationFails = false } = {}) {
       if (storageFails) throw new Error('storage unavailable');
       stored.push(submission);
     },
-    notifyContact: async (submission) => {
-      assert.equal(stored.length, 1, 'notification follows successful storage');
-      notified.push(submission);
-      if (notificationFails) throw new Error('notification unavailable');
-    },
     logError: (...args) => errors.push(args),
   });
   return { handler, stored, notified, errors };
 }
 
-test('accepts a stored contact and attempts its notification', async () => {
+test('accepts a stored contact with a durable pending notification', async () => {
   const { handler, stored, notified, errors } = setup();
   const result = await handler(event);
   assert.equal(result.statusCode, 202);
@@ -31,17 +27,9 @@ test('accepts a stored contact and attempts its notification', async () => {
   assert.equal(stored[0].name, 'Henry');
   assert.equal(stored[0].email, 'henry@example.com');
   assert.equal(JSON.parse(result.body).id, stored[0].id);
-  assert.deepEqual(notified, stored);
+  assert.equal(stored[0].notificationStatus, 'pending');
+  assert.deepEqual(notified, []);
   assert.deepEqual(errors, []);
-});
-
-test('notification failure still accepts the stored contact and logs only its ID', async () => {
-  const { handler, stored, errors } = setup({ notificationFails: true });
-  const result = await handler(event);
-  assert.equal(result.statusCode, 202);
-  assert.equal(stored.length, 1);
-  assert.equal(JSON.parse(result.body).id, stored[0].id);
-  assert.deepEqual(errors, [['contact.notification_failed', { submissionId: stored[0].id }]]);
 });
 
 test('storage failure returns a retryable error without notifying', async () => {
@@ -52,6 +40,40 @@ test('storage failure returns a retryable error without notifying', async () => 
   assert.deepEqual(stored, []);
   assert.deepEqual(notified, []);
   assert.equal(errors[0][0], 'contact.storage_failed');
+});
+
+test('concurrent retries and a lost response keep one stored submission', async () => {
+  const rows = new Map();
+  const storeContact = createStoreContact({
+    put: async (submission) => {
+      if (rows.has(submission.id)) {
+        const error = new Error('exists');
+        error.name = 'ConditionalCheckFailedException';
+        throw error;
+      }
+      rows.set(submission.id, submission);
+    },
+    get: async (id) => rows.get(id),
+  });
+  const handler = createHandler({ storeContact });
+  const key = '12345678-1234-4234-8234-123456789abc';
+  const request = { ...event, headers: { 'Idempotency-Key': key } };
+  const responses = await Promise.all([handler(request), handler(request)]);
+  responses.push(await handler(request));
+  assert.equal(rows.size, 1);
+  for (const result of responses) {
+    assert.equal(result.statusCode, 202);
+    assert.equal(JSON.parse(result.body).id, key);
+  }
+  const conflict = await handler({ ...request, body: JSON.stringify({ name: 'Different', email: 'other@example.com' }) });
+  assert.equal(conflict.statusCode, 409);
+  assert.equal(rows.get(key).name, 'Henry');
+});
+
+test('invalid submission keys are rejected before storage', async () => {
+  const { handler, stored } = setup();
+  assert.equal((await handler({ ...event, headers: { 'idempotency-key': 'bad-key' } })).statusCode, 400);
+  assert.deepEqual(stored, []);
 });
 
 test('invalid JSON and invalid contacts produce no external effects', async () => {

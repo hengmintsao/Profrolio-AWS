@@ -4,9 +4,11 @@ A serverless portfolio website that demonstrates frontend development, infrastru
 
 ## Architecture
 
-The frontend is delivered through CloudFront from a private S3 bucket. Contact requests pass through an API Gateway HTTP API to Lambda, which validates and stores the submission in DynamoDB and publishes an SNS notification.
+The frontend is delivered through CloudFront from a private S3 bucket. Contact requests pass through an API Gateway HTTP API to Lambda, which validates and stores the submission in DynamoDB. A separate Lambda consumes DynamoDB Streams to publish SNS notifications with bounded retries and an SQS failure destination. The browser reuses a submission key after uncertain failures to prevent duplicate records.
 
 See [the architecture notes](docs/architecture.md) for the data flow and design decisions.
+
+See [contact operations](docs/contact-operations.md) for deployment verification, retry limits and recovery.
 
 ## Repository structure
 
