@@ -1,0 +1,91 @@
+name: Deploy to AWS
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: portfolio-production
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    needs: checks
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      STACK_NAME: ${{ vars.SAM_STACK_NAME || 'portfolio-aws' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Check deployment configuration
+        env:
+          AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+        run: |
+          if [ -z "$AWS_ROLE_ARN" ]; then
+            echo '::error::Set AWS_ROLE_ARN and configure its GitHub OIDC trust for the production environment.'
+            exit 1
+          fi
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+        working-directory: backend
+      - uses: aws-actions/setup-sam@v2
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      - name: Build application
+        run: sam build --template-file infrastructure/template.yaml
+      - name: Deploy infrastructure
+        env:
+          ALLOWED_ORIGIN: ${{ vars.ALLOWED_ORIGIN || '*' }}
+          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL }}
+        run: >-
+          sam deploy
+          --stack-name "$STACK_NAME"
+          --region "$AWS_REGION"
+          --resolve-s3
+          --capabilities CAPABILITY_IAM
+          --no-confirm-changeset
+          --no-fail-on-empty-changeset
+          --parameter-overrides
+          AllowedOrigin="$ALLOWED_ORIGIN"
+          NotificationEmail="$NOTIFICATION_EMAIL"
+      - name: Read stack outputs
+        id: stack
+        shell: bash
+        run: |
+          outputs=$(aws cloudformation describe-stacks \
+            --stack-name "$STACK_NAME" \
+            --query 'Stacks[0].Outputs' --output json)
+          echo "api_url=$(jq -r '.[] | select(.OutputKey=="ApiEndpoint").OutputValue' <<< "$outputs")" >> "$GITHUB_OUTPUT"
+          echo "bucket=$(jq -r '.[] | select(.OutputKey=="FrontendBucketName").OutputValue' <<< "$outputs")" >> "$GITHUB_OUTPUT"
+          echo "distribution=$(jq -r '.[] | select(.OutputKey=="DistributionId").OutputValue' <<< "$outputs")" >> "$GITHUB_OUTPUT"
+      - name: Inject runtime configuration
+        shell: bash
+        env:
+          API_URL: ${{ steps.stack.outputs.api_url }}
+        run: |
+          printf 'window.APP_CONFIG = {\n  API_URL: "%s"\n};\n' "$API_URL" > frontend/js/config.js
+      - name: Publish frontend
+        run: aws s3 sync frontend/ "s3://${{ steps.stack.outputs.bucket }}" --delete
+      - name: Refresh CloudFront
+        run: aws cloudfront create-invalidation --distribution-id "${{ steps.stack.outputs.distribution }}" --paths '/*'
