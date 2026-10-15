@@ -1,11 +1,10 @@
 import crypto from 'node:crypto';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
-import { PublishCommand, SNSClient } from '@aws-sdk/client-sns';
+import { DynamoDBDocumentClient, PutCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
 import { validateContact } from './validation.js';
+import { createStoreContact } from './storage.js';
 
 const dynamodb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
-const sns = new SNSClient({});
 
 function response(statusCode, body) {
   return {
@@ -19,7 +18,7 @@ function response(statusCode, body) {
   };
 }
 
-export function createHandler({ storeContact, notifyContact, logError = console.error }) {
+export function createHandler({ storeContact, logError = console.error }) {
   return async function handleContact(event) {
     let input;
 
@@ -34,25 +33,28 @@ export function createHandler({ storeContact, notifyContact, logError = console.
       return response(400, { message: result.reason });
     }
 
+    const key = Object.entries(event.headers || {}).find(([name]) => name.toLowerCase() === 'idempotency-key')?.[1];
+    if (key !== undefined && (typeof key !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(key))) {
+      return response(400, { message: 'Idempotency-Key must be a UUID v4' });
+    }
+
     const submission = {
-      id: crypto.randomUUID(),
+      id: key?.toLowerCase() || crypto.randomUUID(),
       ...result.value,
+      payloadFingerprint: crypto.createHash('sha256').update(JSON.stringify(result.value)).digest('hex'),
+      notificationStatus: 'pending',
       createdAt: new Date().toISOString(),
       expiresAt: Math.floor(Date.now() / 1000) + (90 * 24 * 60 * 60),
     };
 
     try {
       await storeContact(submission);
-    } catch {
+    } catch (error) {
+      if (error.name === 'IdempotencyConflict') {
+        return response(409, { message: 'This submission key was already used for different contact details.' });
+      }
       logError('contact.storage_failed', { submissionId: submission.id });
       return response(503, { message: 'Unable to accept message. Please try again later.' });
-    }
-
-    try {
-      await notifyContact(submission);
-    } catch {
-      // Storage defines acceptance; notification failure must not invite resubmission.
-      logError('contact.notification_failed', { submissionId: submission.id });
     }
 
     return response(202, { message: 'Message accepted', id: submission.id });
@@ -60,21 +62,16 @@ export function createHandler({ storeContact, notifyContact, logError = console.
 }
 
 export const handler = createHandler({
-  storeContact: (submission) => dynamodb.send(new PutCommand({
-    TableName: process.env.TABLE_NAME,
-    Item: submission,
-    ConditionExpression: 'attribute_not_exists(id)',
-  })),
-
-  notifyContact: (submission) => sns.send(new PublishCommand({
-    TopicArn: process.env.TOPIC_ARN,
-    Subject: `Portfolio contact from ${submission.name}`.slice(0, 100),
-    Message: [
-      `Name: ${submission.name}`,
-      `Email: ${submission.email}`,
-      `Phone: ${submission.phone || 'Not provided'}`,
-      '',
-      submission.message || 'No message provided',
-    ].join('\n'),
-  }), { abortSignal: AbortSignal.timeout(2000) }),
+  storeContact: createStoreContact({
+    put: (submission) => dynamodb.send(new PutCommand({
+      TableName: process.env.TABLE_NAME,
+      Item: submission,
+      ConditionExpression: 'attribute_not_exists(id)',
+    })),
+    get: async (id) => (await dynamodb.send(new GetCommand({
+      TableName: process.env.TABLE_NAME,
+      Key: { id },
+      ConsistentRead: true,
+    }))).Item,
+  }),
 });

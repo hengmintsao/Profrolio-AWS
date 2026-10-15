@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test",
-    "check": "node --check src/handler.js && node --check src/validation.js"
+    "check": "node --check src/handler.js && node --check src/validation.js && node --check src/storage.js && node --check src/notification.js"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.0.0",
