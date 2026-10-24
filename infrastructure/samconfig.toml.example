@@ -6,4 +6,6 @@ resolve_s3 = true
 capabilities = "CAPABILITY_IAM"
 region = "us-east-1"
 confirm_changeset = true
-parameter_overrides = "AllowedOrigin=\"*\" NotificationEmail=\"you@example.com\""
+# PrimaryDomainName and CertificateArn default to the project's production domain.
+# Optionally set NotificationEmail and confirm its SNS subscription after deploy.
+# parameter_overrides = "NotificationEmail=\"you@example.com\""

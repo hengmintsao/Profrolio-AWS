@@ -1,0 +1,28 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "CreateTaggedPortfolioRedirectFunction",
+      "Effect": "Allow",
+      "Action": "cloudfront:CreateFunction",
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/Project": "portfolio-aws"
+        }
+      }
+    },
+    {
+      "Sid": "ManagePortfolioCanonicalRedirectFunction",
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:DescribeFunction",
+        "cloudfront:GetFunction",
+        "cloudfront:UpdateFunction",
+        "cloudfront:PublishFunction",
+        "cloudfront:DeleteFunction"
+      ],
+      "Resource": "arn:aws:cloudfront::412381749585:function/portfolio-aws-canonical-domain"
+    }
+  ]
+}

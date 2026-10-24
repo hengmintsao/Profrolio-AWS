@@ -19,6 +19,14 @@ GitHub Actions (OIDC)
 ## Design decisions
 
 - CloudFront is the only public entry point for frontend assets; the S3 bucket blocks public access.
+- The primary hostname is `henry-tsao.com`. SAM manages its CloudFront aliases
+  and existing ACM certificate reference. A viewer-request CloudFront Function
+  redirects `www.henry-tsao.com` to the primary HTTPS hostname with a 301 response,
+  preserving the path and query parameters, including repeated parameters.
+- Contact CORS and the Lambda response origin are derived from the same SAM
+  `PrimaryDomainName` parameter. Only the primary HTTPS origin is allowed.
+- DNS aliases and certificate validation records remain in the existing Route 53
+  hosted zone; this stack does not create duplicate DNS records or certificates.
 - API Gateway provides CORS and request throttling before invoking Lambda.
 - Lambda validates all input, ignores bot honeypot submissions, and has least-privilege access to DynamoDB and SNS.
 - DynamoDB uses on-demand billing, encryption, point-in-time recovery, and a 90-day TTL for contact data.
@@ -43,8 +51,6 @@ GitHub Actions (OIDC)
 
 ## Production follow-ups
 
-- Replace the initial `AllowedOrigin=*` with the final HTTPS domain.
 - Add durable notification retries and idempotent submission handling.
-- Add Route 53 and ACM resources when a custom domain is selected.
 - Route the CloudWatch alarm to a dedicated operational notification topic.
 - Add AWS WAF or CAPTCHA if automated submissions become a problem.

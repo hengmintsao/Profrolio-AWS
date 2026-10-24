@@ -56,12 +56,11 @@ jobs:
         run: sam build --template-file infrastructure/template.yaml
       - name: Deploy infrastructure
         env:
-          ALLOWED_ORIGIN: ${{ vars.ALLOWED_ORIGIN || '*' }}
           NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL }}
         run: |
-          parameters=("AllowedOrigin=$ALLOWED_ORIGIN")
+          parameters=()
           if [ -n "$NOTIFICATION_EMAIL" ]; then
-            parameters+=("NotificationEmail=$NOTIFICATION_EMAIL")
+            parameters=(--parameter-overrides "NotificationEmail=$NOTIFICATION_EMAIL")
           fi
           sam deploy \
             --stack-name "$STACK_NAME" \
@@ -70,7 +69,7 @@ jobs:
             --capabilities CAPABILITY_IAM \
             --no-confirm-changeset \
             --no-fail-on-empty-changeset \
-            --parameter-overrides "${parameters[@]}"
+            "${parameters[@]}"
       - name: Read stack outputs
         id: stack
         shell: bash
