@@ -3,10 +3,16 @@ Transform: AWS::Serverless-2016-10-31
 Description: Serverless infrastructure for Hengmin Tsao's portfolio.
 
 Parameters:
-  AllowedOrigin:
+  PrimaryDomainName:
     Type: String
-    Default: '*'
-    Description: HTTPS origin allowed to call the contact API. Replace * after the first deployment.
+    Default: henry-tsao.com
+    AllowedPattern: '[a-z0-9]+([.-][a-z0-9]+)*\.[a-z]{2,}'
+    Description: Primary public hostname; www redirects here and CORS allows this HTTPS origin.
+  CertificateArn:
+    Type: String
+    Default: arn:aws:acm:us-east-1:412381749585:certificate/97d2f497-56d5-48ed-bd7a-20c48f92d467
+    AllowedPattern: 'arn:aws:acm:us-east-1:[0-9]{12}:certificate/[0-9a-f-]+'
+    Description: Existing issued ACM certificate in us-east-1 covering the primary hostname and www.
   NotificationEmail:
     Type: String
     Default: ''
@@ -26,7 +32,7 @@ Globals:
       Variables:
         TABLE_NAME: !Ref ContactTable
         TOPIC_ARN: !Ref ContactTopic
-        ALLOWED_ORIGIN: !Ref AllowedOrigin
+        ALLOWED_ORIGIN: !Sub https://${PrimaryDomainName}
 
 Resources:
   ContactApi:
@@ -35,7 +41,7 @@ Resources:
       StageName: '$default'
       CorsConfiguration:
         AllowOrigins:
-          - !Ref AllowedOrigin
+          - !Sub https://${PrimaryDomainName}
         AllowHeaders:
           - content-type
         AllowMethods:
@@ -176,11 +182,53 @@ Resources:
             ModeBlock: true
             Override: true
 
+  CanonicalDomainRedirect:
+    Type: AWS::CloudFront::Function
+    Properties:
+      Name: !Sub ${AWS::StackName}-canonical-domain
+      AutoPublish: true
+      Tags:
+        - Key: Project
+          Value: portfolio-aws
+      FunctionConfig:
+        Comment: Redirect www to the primary HTTPS domain while preserving path and query.
+        Runtime: cloudfront-js-2.0
+      FunctionCode: !Sub |
+        function handler(event) {
+          var request = event.request;
+          var primaryDomain = '${PrimaryDomainName}';
+          if (request.headers.host.value.toLowerCase() !== 'www.' + primaryDomain) {
+            return request;
+          }
+          var query = [];
+          var parameters = request.querystring || {};
+          for (var key in parameters) {
+            var values = parameters[key].multiValue || [parameters[key]];
+            for (var i = 0; i < values.length; i++) {
+              query.push(key + '=' + values[i].value);
+            }
+          }
+          return {
+            statusCode: 301,
+            statusDescription: 'Moved Permanently',
+            headers: {
+              location: { value: 'https://' + primaryDomain + request.uri + (query.length ? '?' + query.join('&') : '') }
+            }
+          };
+        }
+
   FrontendDistribution:
     Type: AWS::CloudFront::Distribution
     Properties:
       DistributionConfig:
         Enabled: true
+        Aliases:
+          - !Ref PrimaryDomainName
+          - !Sub www.${PrimaryDomainName}
+        ViewerCertificate:
+          AcmCertificateArn: !Ref CertificateArn
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: TLSv1.2_2021
         HttpVersion: http2and3
         DefaultRootObject: index.html
         PriceClass: PriceClass_100
@@ -197,6 +245,9 @@ Resources:
           CachedMethods: [GET, HEAD, OPTIONS]
           CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
           ResponseHeadersPolicyId: !Ref FrontendResponseHeadersPolicy
+          FunctionAssociations:
+            - EventType: viewer-request
+              FunctionARN: !GetAtt CanonicalDomainRedirect.FunctionMetadata.FunctionARN
 
   FrontendBucketPolicy:
     Type: AWS::S3::BucketPolicy
@@ -227,4 +278,7 @@ Outputs:
     Value: !Ref FrontendDistribution
   WebsiteUrl:
     Description: HTTPS portfolio URL.
+    Value: !Sub https://${PrimaryDomainName}
+  CloudFrontUrl:
+    Description: CloudFront distribution hostname for DNS alias targets.
     Value: !Sub https://${FrontendDistribution.DomainName}

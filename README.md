@@ -64,7 +64,17 @@ Use the generated `ApiEndpoint` stack output to update `frontend/js/config.js`, 
 
 If `NotificationEmail` is supplied, AWS sends a subscription confirmation message. Notifications do not begin until that link is confirmed.
 
-After the first deployment, redeploy with `AllowedOrigin` set to the exact CloudFront or custom-domain origin instead of `*`.
+The production URL is https://henry-tsao.com. https://www.henry-tsao.com redirects
+to the primary hostname, preserving the path and query parameters. The SAM
+`PrimaryDomainName` parameter controls both hostnames and the exact HTTPS origin
+allowed by the contact form. `CertificateArn` references the existing issued ACM
+certificate in us-east-1; it must cover both hostnames. DNS aliases and ACM
+validation records remain managed in the existing Route 53 hosted zone.
+
+The deployment role needs CloudFront Function create/read/update/publish/delete
+permissions for `portfolio-aws-canonical-domain` in addition to distribution
+permissions. See `infrastructure/custom-domain-function-policy.json` for the
+additional inline policy. This does not grant Lambda function permissions.
 
 ## GitHub Actions deployment
 
@@ -76,7 +86,11 @@ Configure these repository settings:
 | Secret | `NOTIFICATION_EMAIL` | SNS notification recipient |
 | Variable | `AWS_REGION` | Deployment region, defaults to `us-east-1` |
 | Variable | `SAM_STACK_NAME` | CloudFormation stack name, defaults to `portfolio-aws` |
-| Variable | `ALLOWED_ORIGIN` | Exact production HTTPS origin after initial deployment |
+| SAM parameter | `PrimaryDomainName` | Primary hostname; defaults to `henry-tsao.com` |
+| SAM parameter | `CertificateArn` | Existing ACM certificate covering the primary hostname and www |
+
+`ALLOWED_ORIGIN` is derived from `PrimaryDomainName` in SAM. The deployment
+workflow no longer reads the old GitHub `ALLOWED_ORIGIN` variable.
 
 The deployment role should be restricted to this repository and production environment. Do not store AWS access keys in GitHub.
 
