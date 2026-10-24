@@ -58,17 +58,19 @@ jobs:
         env:
           ALLOWED_ORIGIN: ${{ vars.ALLOWED_ORIGIN || '*' }}
           NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL }}
-        run: >-
-          sam deploy
-          --stack-name "$STACK_NAME"
-          --region "$AWS_REGION"
-          --resolve-s3
-          --capabilities CAPABILITY_IAM
-          --no-confirm-changeset
-          --no-fail-on-empty-changeset
-          --parameter-overrides
-          AllowedOrigin="$ALLOWED_ORIGIN"
-          NotificationEmail="$NOTIFICATION_EMAIL"
+        run: |
+          parameters=("AllowedOrigin=$ALLOWED_ORIGIN")
+          if [ -n "$NOTIFICATION_EMAIL" ]; then
+            parameters+=("NotificationEmail=$NOTIFICATION_EMAIL")
+          fi
+          sam deploy \
+            --stack-name "$STACK_NAME" \
+            --region "$AWS_REGION" \
+            --resolve-s3 \
+            --capabilities CAPABILITY_IAM \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --parameter-overrides "${parameters[@]}"
       - name: Read stack outputs
         id: stack
         shell: bash
