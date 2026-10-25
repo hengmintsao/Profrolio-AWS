@@ -32,6 +32,7 @@ export function configuration(env) {
     throw Error('Invalid source SHA.');
   if (!/^\d{12}$/.test(value.account || '') || value.region !== 'us-east-1')
     throw Error('An explicit AWS account and us-east-1 are required.');
+  value.runtimeBoundaryArn = `arn:aws:iam::${value.account}:policy/PortfolioCmsRuntimeBoundary`;
   for (const stack of [value.cmsStack, value.websiteStack])
     if (!/^[A-Za-z][A-Za-z0-9-]{0,127}$/.test(stack || ''))
       throw Error('Explicit valid stack names are required.');
@@ -238,6 +239,21 @@ export async function deliver(
   };
   if (aws(['sts', 'get-caller-identity']).Account !== config.account)
     throw Error('AWS account mismatch.');
+  if (config.operation === 'backend') {
+    const policy = aws([
+      'iam',
+      'get-policy',
+      '--policy-arn',
+      config.runtimeBoundaryArn,
+    ]).Policy;
+    if (
+      policy?.Arn !== config.runtimeBoundaryArn ||
+      policy.IsAttachable !== true
+    )
+      throw Error(
+        'The expected attachable CMS runtime permissions boundary is required.',
+      );
+  }
   const describe = (name, optional = false) => {
     try {
       return aws(['cloudformation', 'describe-stacks', '--stack-name', name])
@@ -353,6 +369,7 @@ export async function deliver(
       config.operation === 'backend'
         ? {
             ReleaseSourceSha: config.source,
+            RuntimePermissionsBoundaryArn: config.runtimeBoundaryArn,
             PrimaryOrigin: `https://${parameter(website, 'PrimaryDomainName')}`,
             CognitoDomainPrefix: config.domainPrefix,
           }

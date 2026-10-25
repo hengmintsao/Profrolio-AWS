@@ -65,6 +65,13 @@ never substitute a branch name or move an existing tag to retry.
 1. Choose `backend` to provision or update only the separate CMS stack. Complete
    the production review before planning; SAM packaging uploads code to the
    configured artifact bucket and planning creates a CloudFormation change set.
+   First verify that the separately reviewed `PortfolioCmsRuntimeBoundary`
+   customer-managed policy exists in the target account. Backend delivery derives
+   its exact ARN from `AWS_ACCOUNT_ID`, checks it through `iam:GetPolicy`, and
+   passes `RuntimePermissionsBoundaryArn` to the template. Missing or unexpected
+   policies stop the operation before packaging or execution. IAM static checks
+   do not prove data-plane compatibility; inspect the current policy document
+   and test runtime access during authorized AWS acceptance.
 2. Review the retained plan artifact, exact source/account/Region/stack, resource
    additions and modifications, and recovery material before approving execution.
    Replacement, deletion, stale plans and mismatched identities must stop the run.

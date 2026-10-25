@@ -1,0 +1,37 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "CmsRuntimeConditionalProjectRecords",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:ConditionCheckItem"
+      ],
+      "Resource": "arn:aws:dynamodb:us-east-1:412381749585:table/portfolio-cms-prod-CmsTable-*"
+    },
+    {
+      "Sid": "CmsRuntimeListing",
+      "Effect": "Allow",
+      "Action": "dynamodb:Query",
+      "Resource": "arn:aws:dynamodb:us-east-1:412381749585:table/portfolio-cms-prod-CmsTable-*"
+    },
+    {
+      "Sid": "CmsRuntimePrivateImageObjects",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:PutObject"],
+      "Resource": [
+        "arn:aws:s3:::portfolio-cms-prod-cmsmediabucket-*/incoming/*",
+        "arn:aws:s3:::portfolio-cms-prod-cmsmediabucket-*/verified/*"
+      ]
+    },
+    {
+      "Sid": "CmsRuntimeFunctionLogs",
+      "Effect": "Allow",
+      "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],
+      "Resource": "arn:aws:logs:us-east-1:412381749585:log-group:/aws/lambda/portfolio-cms-prod-handler:*"
+    }
+  ]
+}

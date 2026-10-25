@@ -90,6 +90,13 @@ through OIDC. Configure `AWS_ROLE_ARN`, optional `NOTIFICATION_EMAIL`, and the
 OIDC trust, least-privilege IAM, environment reviewers, and branch/tag protection
 must be verified before a real release. Never store AWS access keys in Git.
 
+CMS backend delivery also requires an existing customer-managed
+`PortfolioCmsRuntimeBoundary` policy in the selected account. The workflow checks
+that policy before planning or execution, and the CMS template requires it on the
+Lambda execution role. Review `infrastructure/cms-runtime-boundary-policy.json`
+against the actual account and CMS stack before separately authorizing creation.
+The boundary limits identity-policy permissions; it grants no access by itself.
+
 See [architecture](docs/architecture.md) for contact acceptance, retention, and
 known notification/idempotency follow-ups. See
 [CMS AWS setup](docs/operations/cms-aws-setup.md) for the additional production

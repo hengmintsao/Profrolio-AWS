@@ -2,6 +2,11 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: Isolated portfolio CMS; existing website stack remains unchanged.
 Parameters:
+  RuntimePermissionsBoundaryArn:
+    Type: String
+    AllowedPattern: 'arn:aws:iam::[0-9]{12}:policy/PortfolioCmsRuntimeBoundary'
+    ConstraintDescription: Use the pre-existing PortfolioCmsRuntimeBoundary managed policy in the deployment account.
+    Description: Independently administered maximum runtime permissions; required before CMS deployment.
   ReleaseSourceSha:
     Type: String
     Default: ''
@@ -149,6 +154,7 @@ Resources:
   CmsExecutionRole:
     Type: AWS::IAM::Role
     Properties:
+      PermissionsBoundary: !Ref RuntimePermissionsBoundaryArn
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
