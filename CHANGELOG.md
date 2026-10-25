@@ -2,7 +2,14 @@
 
 ## Unreleased
 
+## 1.0.1 (prepared; not published)
+
 - Recover explicitly identified failed initial CMS plans without deleting the placeholder stack or executing unreviewed changes.
+- Bind recovery input into reviewed plan/apply configuration and reject incomplete history, wrong identities, resource activity and intervening placeholder changes.
+- Synchronize workspace, web and backend patch versions; dependencies remain unchanged.
+
+## 1.0.0
+
 
 - Require a preexisting account-scoped CMS runtime permissions boundary in backend delivery and the execution-role template.
 - Keep text checkouts in LF format across platforms so Windows branch switches remain compatible with formatting checks.
@@ -11,7 +18,7 @@
 - Keep legacy deployment from overwriting a CMS-mode site; add conditional SPA routing, exact-origin CSP and zero-minimum-TTL caching.
 - Document production owner enrollment, AWS configuration and live acceptance prerequisites; no CMS deployment is implied.
 
-- Candidate workspace version 1.0.0; no release tag has been published.
+- Published source release v1.0.0. Publication does not establish successful CMS deployment or production acceptance.
 - Portfolio CMS preview and engineering quality tooling.
 - Unified release-readiness gate and manual annotated-tag legacy deployment.
 - Pinned actions, checked package versions, retained deployment inputs and source metadata.
