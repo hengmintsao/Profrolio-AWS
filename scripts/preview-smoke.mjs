@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { startServer } from './e2e-process.mjs';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
@@ -11,39 +11,35 @@ const sharp = createRequire(
 // Starts its own isolated memory server. Never targets production or an existing server.
 const root = fileURLToPath(new URL('../', import.meta.url));
 const children = [];
-const origin = 'http://127.0.0.1:5173';
-function start(args, ready) {
-  return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, args, {
-      cwd: root,
-      windowsHide: true,
-    });
-    children.push(child);
-    let output = '';
-    const timer = setTimeout(
-      () => reject(new Error(`Preview startup timed out: ${output}`)),
-      15000,
-    );
-    child.stdout.on('data', (chunk) => {
-      output += chunk;
-      if (ready.test(output)) {
-        clearTimeout(timer);
-        resolve();
+const origin = 'http://127.0.0.1:4175';
+let stopping = false;
+function stop(code = 0) {
+  if (stopping) return;
+  stopping = true;
+  for (const child of children) child.kill('SIGTERM');
+  process.exitCode = code;
+}
+function start(args, readyURL) {
+  return startServer({
+    args,
+    cwd: root,
+    env: {
+      ...process.env,
+      PORTFOLIO_CMS_PORT: '8789',
+      PORTFOLIO_WEB_PORT: '4175',
+    },
+    readyURL,
+    onSpawn: (child) => children.push(child),
+    onUnexpectedExit: (error) => {
+      if (!stopping) {
+        console.error(error);
+        stop(1);
       }
-    });
-    child.stderr.on('data', (chunk) => {
-      output += chunk;
-    });
-    child.once('error', (error) => {
-      clearTimeout(timer);
-      reject(error);
-    });
-    child.once('exit', (code) => {
-      clearTimeout(timer);
-      reject(new Error(`Preview exited (${code}): ${output}`));
-    });
+    },
   });
 }
+process.on('SIGINT', () => stop());
+process.on('SIGTERM', () => stop());
 async function call(
   path,
   { method = 'GET', body, auth = true, status = 200 } = {},
@@ -65,7 +61,10 @@ async function call(
   return result;
 }
 try {
-  await start(['backend/src/cms/dev-server.js'], /Local CMS:/);
+  await start(
+    ['backend/src/cms/dev-server.js'],
+    'http://127.0.0.1:8789/api/public/projects',
+  );
   await start(
     [
       'web/node_modules/vite/bin/vite.js',
@@ -73,10 +72,10 @@ try {
       '--host',
       '127.0.0.1',
       '--port',
-      '5173',
+      '4175',
       '--strictPort',
     ],
-    /Local:/,
+    `${origin}/api/public/projects`,
   );
   const page = await fetch(`${origin}/admin/projects`, {
     headers: { Accept: 'text/html' },
@@ -183,5 +182,5 @@ try {
     'PASS: isolated HTTP preview, auth, same-origin image upload, draft privacy, publication snapshot, stale revision, trash/media revocation and unpublished restore.',
   );
 } finally {
-  for (const child of children) child.kill('SIGTERM');
+  stop(process.exitCode || 0);
 }

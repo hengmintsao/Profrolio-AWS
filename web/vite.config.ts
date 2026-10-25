@@ -1,5 +1,6 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
+import process from 'node:process';
 const cmsPort = Number(process.env.PORTFOLIO_CMS_PORT || 8787);
 if (!Number.isInteger(cmsPort) || cmsPort < 1024 || cmsPort > 65535)
   throw Error('Invalid local CMS port.');

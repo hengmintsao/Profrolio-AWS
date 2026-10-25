@@ -109,8 +109,9 @@ These are local checks, not GitHub CI or AWS acceptance results. The additional
 application but does not deploy the CMS. See `operations/portfolio-cms.md` for
 production prerequisites and `CONTRIBUTING.md` for the complete delivery process.
 
-The optional `npm run test:preview` starts its own disposable servers on ports 5173/8787 and stops them
-afterward. Close any existing preview first. It checks actual HTTP requests through
+The optional `npm run test:preview` starts its own disposable servers on ports
+4175/8789 and stops them afterward. It leaves the normal 5173/8787 preview alone
+and uses HTTP readiness rather than console text, including in colorized CI logs. It checks actual HTTP requests through
 the Vite proxy, including uploads and publication lifecycle; it is not a rendered
 browser, keyboard, screen-reader or phone layout test.
 
