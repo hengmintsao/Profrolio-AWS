@@ -1,0 +1,234 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Isolated portfolio CMS; existing website stack remains unchanged.
+Parameters:
+  PrimaryOrigin:
+    Type: String
+    Default: https://henry-tsao.com
+    AllowedPattern: 'https://[A-Za-z0-9.-]+'
+  CognitoDomainPrefix:
+    Type: String
+    Description: Unique Cognito hosted-domain prefix in this Region.
+    MinLength: 1
+    MaxLength: 63
+    AllowedPattern: '[a-z0-9](?:[a-z0-9-]*[a-z0-9])?'
+Resources:
+  CmsTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - {AttributeName: pk, AttributeType: S}
+        - {AttributeName: gsiPk, AttributeType: S}
+        - {AttributeName: gsiSk, AttributeType: S}
+      KeySchema:
+        - {AttributeName: pk, KeyType: HASH}
+      GlobalSecondaryIndexes:
+        - IndexName: ListingIndex
+          KeySchema:
+            - {AttributeName: gsiPk, KeyType: HASH}
+            - {AttributeName: gsiSk, KeyType: RANGE}
+          Projection: {ProjectionType: ALL}
+      PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
+      SSESpecification: {SSEEnabled: true}
+      Tags: [{Key: Project, Value: portfolio-cms}]
+  CmsMediaBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      PublicAccessBlockConfiguration: {BlockPublicAcls: true, IgnorePublicAcls: true, BlockPublicPolicy: true, RestrictPublicBuckets: true}
+      OwnershipControls:
+        Rules: [{ObjectOwnership: BucketOwnerEnforced}]
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: {SSEAlgorithm: AES256}
+      VersioningConfiguration: {Status: Enabled}
+      CorsConfiguration:
+        CorsRules:
+          - AllowedOrigins: [!Ref PrimaryOrigin]
+            AllowedMethods: [PUT]
+            AllowedHeaders: [Content-Type]
+            ExposedHeaders: [ETag]
+            MaxAge: 300
+      Tags: [{Key: Project, Value: portfolio-cms}]
+  CmsMediaBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref CmsMediaBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: RequireTransportSecurity
+            Effect: Deny
+            Principal: '*'
+            Action: s3:*
+            Resource: [!GetAtt CmsMediaBucket.Arn, !Sub '${CmsMediaBucket.Arn}/*']
+            Condition:
+              Bool: {aws:SecureTransport: 'false'}
+  AdminUserPool:
+    Type: AWS::Cognito::UserPool
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      UserPoolName: !Sub '${AWS::StackName}-admin'
+      DeletionProtection: ACTIVE
+      AdminCreateUserConfig: {AllowAdminCreateUserOnly: true}
+      UsernameAttributes: [email]
+      UsernameConfiguration: {CaseSensitive: false}
+      AutoVerifiedAttributes: [email]
+      MfaConfiguration: 'ON'
+      EnabledMfas: [SOFTWARE_TOKEN_MFA]
+      AccountRecoverySetting:
+        RecoveryMechanisms: [{Name: admin_only, Priority: 1}]
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 14
+          RequireLowercase: true
+          RequireUppercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          TemporaryPasswordValidityDays: 3
+      Schema: [{Name: email, AttributeDataType: String, Mutable: true, Required: true}]
+      UserPoolTags: {Project: portfolio-cms}
+  AdminGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: portfolio-admin
+      Description: Authorized portfolio CMS owner.
+      UserPoolId: !Ref AdminUserPool
+  AdminClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub '${AWS::StackName}-web'
+      UserPoolId: !Ref AdminUserPool
+      GenerateSecret: false
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows: [code]
+      AllowedOAuthScopes: [openid, email, profile]
+      SupportedIdentityProviders: [COGNITO]
+      CallbackURLs: [!Sub '${PrimaryOrigin}/admin/callback']
+      LogoutURLs: [!Sub '${PrimaryOrigin}/admin/login']
+      AccessTokenValidity: 15
+      IdTokenValidity: 15
+      RefreshTokenValidity: 1
+      TokenValidityUnits: {AccessToken: minutes, IdToken: minutes, RefreshToken: days}
+      EnableTokenRevocation: true
+      PreventUserExistenceErrors: ENABLED
+  AdminDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: !Ref CognitoDomainPrefix
+      UserPoolId: !Ref AdminUserPool
+  CmsApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: '$default'
+      CorsConfiguration:
+        AllowOrigins: [!Ref PrimaryOrigin]
+        AllowHeaders: [Content-Type, Authorization]
+        AllowMethods: [GET, POST, PUT, OPTIONS]
+        MaxAge: 300
+      DefaultRouteSettings: {ThrottlingBurstLimit: 10, ThrottlingRateLimit: 5}
+      Auth:
+        DefaultAuthorizer: AdminJwt
+        Authorizers:
+          AdminJwt:
+            IdentitySource: '$request.header.Authorization'
+            JwtConfiguration:
+              issuer: !Sub 'https://cognito-idp.${AWS::Region}.${AWS::URLSuffix}/${AdminUserPool}'
+              audience: [!Ref AdminClient]
+      Tags: {Project: portfolio-cms}
+  CmsExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: lambda.amazonaws.com}
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CmsDataAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ProjectReadsAndConditionalWrites
+                Effect: Allow
+                Action: [dynamodb:GetItem, dynamodb:PutItem, dynamodb:DeleteItem, dynamodb:ConditionCheckItem]
+                Resource: !GetAtt CmsTable.Arn
+              - Sid: ProjectListing
+                Effect: Allow
+                Action: dynamodb:Query
+                Resource: [!GetAtt CmsTable.Arn, !Sub '${CmsTable.Arn}/index/ListingIndex']
+              - Sid: PrivateMediaReadAndWrite
+                Effect: Allow
+                Action: [s3:GetObject, s3:PutObject]
+                Resource: [!Sub '${CmsMediaBucket.Arn}/incoming/*', !Sub '${CmsMediaBucket.Arn}/verified/*']
+              - Sid: FunctionLogs
+                Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AWS::StackName}-handler:*'
+      Tags: [{Key: Project, Value: portfolio-cms}]
+  CmsLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-handler'
+      RetentionInDays: 30
+      Tags: [{Key: Project, Value: portfolio-cms}]
+  CmsFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: CmsLogGroup
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-handler'
+      CodeUri: ../backend
+      Handler: src/cms/handler.handler
+      Runtime: nodejs22.x
+      Architectures: [arm64]
+      MemorySize: 512
+      Timeout: 30
+      Role: !GetAtt CmsExecutionRole.Arn
+      Environment:
+        Variables:
+          CMS_TABLE_NAME: !Ref CmsTable
+          CMS_MEDIA_BUCKET: !Ref CmsMediaBucket
+          COGNITO_CLIENT_ID: !Ref AdminClient
+          ALLOWED_ORIGIN: !Ref PrimaryOrigin
+      Events:
+        PublicRoutes:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref CmsApi
+            Path: /public/{proxy+}
+            Method: ANY
+            Auth: {Authorizer: NONE}
+        AdminRoutes:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref CmsApi
+            Path: /admin/{proxy+}
+            Method: ANY
+      Tags: {Project: portfolio-cms}
+Outputs:
+  ApiBaseUrl:
+    Value: !Sub 'https://${CmsApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}'
+  AuthDomain:
+    Value: !Sub 'https://${CognitoDomainPrefix}.auth.${AWS::Region}.amazoncognito.com'
+  CognitoClientId:
+    Value: !Ref AdminClient
+  CognitoUserPoolId:
+    Value: !Ref AdminUserPool
+  CognitoIssuer:
+    Value: !Sub 'https://cognito-idp.${AWS::Region}.${AWS::URLSuffix}/${AdminUserPool}'
+  RedirectUri:
+    Value: !Sub '${PrimaryOrigin}/admin/callback'
+  LogoutUri:
+    Value: !Sub '${PrimaryOrigin}/admin/login'
+  MediaBucketName:
+    Value: !Ref CmsMediaBucket
+  TableName:
+    Value: !Ref CmsTable

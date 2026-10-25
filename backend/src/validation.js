@@ -18,7 +18,10 @@ export function validateContact(input) {
   }
 
   if (!contact.name || contact.name.length > 100) {
-    return { valid: false, reason: 'Name is required and must be 100 characters or fewer' };
+    return {
+      valid: false,
+      reason: 'Name is required and must be 100 characters or fewer',
+    };
   }
 
   if (!EMAIL_PATTERN.test(contact.email) || contact.email.length > 254) {
@@ -26,7 +29,10 @@ export function validateContact(input) {
   }
 
   if (contact.phone.length > 40 || contact.message.length > 2000) {
-    return { valid: false, reason: 'Contact details exceed the allowed length' };
+    return {
+      valid: false,
+      reason: 'Contact details exceed the allowed length',
+    };
   }
 
   delete contact.website;

@@ -16,11 +16,18 @@ test('accepts and normalizes a valid contact', () => {
 });
 
 test('rejects invalid email addresses', () => {
-  assert.equal(validateContact({ name: 'Henry', email: 'invalid' }).valid, false);
+  assert.equal(
+    validateContact({ name: 'Henry', email: 'invalid' }).valid,
+    false,
+  );
 });
 
 test('rejects honeypot submissions', () => {
-  assert.equal(validateContact({ name: 'Bot', email: 'bot@example.com', website: 'spam' }).valid, false);
+  assert.equal(
+    validateContact({ name: 'Bot', email: 'bot@example.com', website: 'spam' })
+      .valid,
+    false,
+  );
 });
 
 test('rejects oversized messages', () => {

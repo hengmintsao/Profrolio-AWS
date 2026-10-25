@@ -2,6 +2,10 @@ name: CI
 
 on:
   workflow_call:
+    inputs:
+      source_sha:
+        type: string
+        default: ''
   pull_request:
   push:
     branches: [main]
@@ -12,12 +16,15 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
           cache: npm
@@ -28,9 +35,12 @@ jobs:
 
   validate-frontend:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
       - run: node --check frontend/js/config.js
@@ -38,8 +48,47 @@ jobs:
 
   validate-infrastructure:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: aws-actions/setup-sam@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130
+        with:
+          platforms: arm64
+      - uses: aws-actions/setup-sam@f84ec7d548307efafe33230528756de3c5841a17
       - run: sam validate --lint --template-file infrastructure/template.yaml
-      - run: sam build --template-file infrastructure/template.yaml
+      - run: sam build --use-container --template-file infrastructure/template.yaml
+      - name: Archive validated deployment inputs
+        run: |
+          tar -czf deployment-inputs.tgz .aws-sam/build frontend
+          sha256sum deployment-inputs.tgz > deployment-inputs.sha256
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: deployment-inputs-${{ inputs.source_sha || github.sha }}-${{ github.run_attempt }}
+          path: |
+            deployment-inputs.tgz
+            deployment-inputs.sha256
+          retention-days: 90
+          if-no-files-found: error
+
+  application-checks:
+    uses: ./.github/workflows/cms-ci.yml
+    with:
+      source_sha: ${{ inputs.source_sha || github.sha }}
+
+  release-readiness:
+    if: ${{ always() }}
+    needs:
+      [test, validate-frontend, validate-infrastructure, application-checks]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+      - name: Reject unsuccessful required jobs
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          node --input-type=module -e 'import { requireSuccessfulJobs } from "./scripts/release-policy.mjs"; requireSuccessfulJobs(JSON.parse(process.env.RESULTS), ["test", "validate-frontend", "validate-infrastructure", "application-checks"]);'

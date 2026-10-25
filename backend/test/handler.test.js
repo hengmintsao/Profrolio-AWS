@@ -2,7 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHandler } from '../src/handler.js';
 
-const event = { body: JSON.stringify({ name: ' Henry ', email: 'HENRY@example.com', message: 'Hello' }) };
+const event = {
+  body: JSON.stringify({
+    name: ' Henry ',
+    email: 'HENRY@example.com',
+    message: 'Hello',
+  }),
+};
 
 function setup({ storageFails = false, notificationFails = false } = {}) {
   const stored = [];
@@ -41,7 +47,9 @@ test('notification failure still accepts the stored contact and logs only its ID
   assert.equal(result.statusCode, 202);
   assert.equal(stored.length, 1);
   assert.equal(JSON.parse(result.body).id, stored[0].id);
-  assert.deepEqual(errors, [['contact.notification_failed', { submissionId: stored[0].id }]]);
+  assert.deepEqual(errors, [
+    ['contact.notification_failed', { submissionId: stored[0].id }],
+  ]);
 });
 
 test('storage failure returns a retryable error without notifying', async () => {
@@ -56,7 +64,11 @@ test('storage failure returns a retryable error without notifying', async () => 
 
 test('invalid JSON and invalid contacts produce no external effects', async () => {
   const { handler, stored, notified, errors } = setup();
-  for (const body of ['{', '{}', JSON.stringify({ name: 'Bot', email: 'bot@example.com', website: 'spam' })]) {
+  for (const body of [
+    '{',
+    '{}',
+    JSON.stringify({ name: 'Bot', email: 'bot@example.com', website: 'spam' }),
+  ]) {
     assert.equal((await handler({ body })).statusCode, 400);
   }
   assert.deepEqual(stored, []);
