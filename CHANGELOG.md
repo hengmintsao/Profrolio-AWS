@@ -2,7 +2,11 @@
 
 ## Unreleased
 
-## 1.0.1 (prepared; not published)
+## 1.0.2 (prepared; not published)
+
+- Retain the CMS media bucket HTTPS enforcement policy with its retained bucket during rollback, deletion and replacement.
+
+## 1.0.1
 
 - Recover explicitly identified failed initial CMS plans without deleting the placeholder stack or executing unreviewed changes.
 - Bind recovery input into reviewed plan/apply configuration and reject incomplete history, wrong identities, resource activity and intervening placeholder changes.
