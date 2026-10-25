@@ -1,108 +1,112 @@
-# Portfolio AWS
+# Henry Tsao — Portfolio on AWS
 
-A serverless portfolio website that demonstrates frontend development, infrastructure as code, automated delivery, and AWS security practices.
+A portfolio connecting full-stack engineering, business analysis, and cloud
+software delivery. The redesign includes a React/TypeScript public site and an
+owner-only project CMS, with a separate serverless backend proposal.
 
-## Architecture
+## Current status
 
-The frontend is delivered through CloudFront from a private S3 bucket. Contact requests pass through an API Gateway HTTP API to Lambda, which validates and stores the submission in DynamoDB and publishes an SNS notification.
+| Area                                    | Source                                                                | Status                                                                               |
+| --------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Existing website and contact API        | `frontend/`, `backend/src/handler.js`, `infrastructure/template.yaml` | Target of the legacy production deployment workflow                                  |
+| Redesigned portfolio and project editor | `web/`, `backend/src/cms/`                                            | Local implementation with automated checks; not switched into production             |
+| CMS AWS resources                       | `infrastructure/cms-template.yaml`                                    | Separate infrastructure proposal; requires authorized deployment and live acceptance |
 
-See [the architecture notes](docs/architecture.md) for the data flow and design decisions.
+The existing site's primary hostname is [henry-tsao.com](https://henry-tsao.com);
+`www` is configured to redirect to it. This README is not a live availability
+check. The candidate package version is recorded in `package.json`, not proof
+that a matching version has been published.
 
-## Repository structure
+## Start here
 
-```text
-frontend/        Static website and runtime configuration
-backend/         Contact Lambda, validation, and unit tests
-infrastructure/  AWS SAM / CloudFormation template
-docs/            Architecture documentation
-.github/         CI and AWS deployment workflows
+**Every change follows [CONTRIBUTING.md](CONTRIBUTING.md), including documentation,
+dependency updates, hotfixes, and agent-assisted work.** It defines implementation,
+review, secrets, upload, PR, merge, release, acceptance, and recovery gates.
+
+Install Node using `.nvmrc`, npm, Git, and Go. Install all dependency trees, browser
+binaries, and the pinned inspection tools:
+
+```powershell
+npm ci
+npm --prefix backend ci
+npm --prefix web ci
+npx playwright install chromium webkit
+go install github.com/zricethezav/gitleaks/v8@v8.30.1
+go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+npm run hooks:install
+npm run dev
 ```
 
-## AWS services
+Put the Go binary directory on PATH. Workspace-local tools in `.scratch/bin/`
+are also supported. Hook installation applies only to this repository and refuses
+to overwrite an existing hook arrangement. Fresh clones need installation again.
 
-- Amazon CloudFront
-- Amazon S3 with Block Public Access and Origin Access Control
-- Amazon API Gateway HTTP API
-- AWS Lambda
-- Amazon DynamoDB
-- Amazon SNS
-- Amazon CloudWatch
-- AWS CloudFormation through AWS SAM
+Open the Vite Local URL, normally `http://127.0.0.1:5173`. The preview uses a
+loopback-only, in-memory backend on 8787. Its owner token and content are local
+fixtures, not AWS credentials or production authentication. Restarting discards
+preview content. The production Lambda runtime remains Node.js 22/ARM64; the
+workspace tooling uses the version in `.nvmrc`.
 
-## Local development
+## Verify before uploading
 
-Serve `frontend/` with any static HTTP server. The checked-in `frontend/js/config.js` intentionally contains an empty API URL, so local development does not send messages to production by accident.
-
-Run the backend checks:
-
-```bash
-cd backend
-npm install
-npm run check
-npm test
+```powershell
+npm run preflight
 ```
 
-To test the form against an already deployed API, temporarily set `API_URL` in `frontend/js/config.js`. Do not commit environment-specific URLs.
+This runs repository inclusion, Gitleaks history/index/working-tree scans,
+release/workflow controls, English-language checks, lint, formatting, type/build
+checks, tooling/unit/browser tests, dependency audits, actionlint, and Git
+whitespace checks. See the [development guide](docs/development.md) for focused
+commands and isolated E2E behavior.
 
-## Deploy with AWS SAM
+The installed pre-push hook requires a clean working tree and index, checks that
+outgoing refs identify the tested HEAD, and reruns preflight. It rejects direct
+main pushes and remote deletions. Local hooks can be bypassed or absent, so they
+supplement GitHub branch protection and human authorization. No local tool proves
+that an agent reviewed work or that a user approved it.
 
-Prerequisites:
+## Delivery and AWS
 
-- AWS CLI configured for the target account
-- AWS SAM CLI
-- Node.js 22
+[CI](.github/workflows/ci.yml) runs the legacy and reusable CMS checks at the same
+source SHA. Its `release-readiness` gate rejects failed, cancelled, skipped, or
+missing required results. The GitHub ruleset must separately require the actual
+observed check name; this repository cannot enforce that setting by itself.
 
-```bash
-cd backend
-npm install
-cd ..
-sam build --template-file infrastructure/template.yaml
-sam deploy --guided
-```
+[Deployment](.github/workflows/deploy.yml) is manual from `main` and accepts an
+existing annotated `vX.Y.Z` tag with matching package/lock versions. It rechecks
+that source, verifies the same run's archived SAM build and legacy frontend,
+then deploys the existing stack and publishes `frontend/`. It does **not** deploy
+`web/dist/` or switch the CMS into production. Follow the
+[release and recovery runbook](docs/operations/releases.md); direct manual AWS
+commands are not the normal release path.
 
-Use the generated `ApiEndpoint` stack output to update `frontend/js/config.js`, then upload `frontend/` to the `FrontendBucketName` output and invalidate the `DistributionId` output. The GitHub deployment workflow performs these steps automatically.
+Production uses CloudFront, private S3, API Gateway, Lambda, DynamoDB, SNS,
+CloudWatch, and AWS SAM/CloudFormation. GitHub obtains short-lived AWS access
+through OIDC. Configure `AWS_ROLE_ARN`, optional `NOTIFICATION_EMAIL`, and the
+`AWS_REGION`/`SAM_STACK_NAME` variables for the authorized production target.
+OIDC trust, least-privilege IAM, environment reviewers, and branch/tag protection
+must be verified before a real release. Never store AWS access keys in Git.
 
-If `NotificationEmail` is supplied, AWS sends a subscription confirmation message. Notifications do not begin until that link is confirmed.
+See [architecture](docs/architecture.md) for contact acceptance, retention, and
+known notification/idempotency follow-ups. See
+[CMS operations](docs/operations/portfolio-cms.md) for authentication, media,
+data, cost, deployment, and cutover prerequisites.
 
-The production URL is https://henry-tsao.com. https://www.henry-tsao.com redirects
-to the primary hostname, preserving the path and query parameters. The SAM
-`PrimaryDomainName` parameter controls both hostnames and the exact HTTPS origin
-allowed by the contact form. `CertificateArn` references the existing issued ACM
-certificate in us-east-1; it must cover both hostnames. DNS aliases and ACM
-validation records remain managed in the existing Route 53 hosted zone.
+## Repository map
 
-The deployment role needs CloudFront Function create/read/update/publish/delete
-permissions for `portfolio-aws-canonical-domain` in addition to distribution
-permissions. See `infrastructure/custom-domain-function-policy.json` for the
-additional inline policy. This does not grant Lambda function permissions.
+| Path                     | Purpose                                                     |
+| ------------------------ | ----------------------------------------------------------- |
+| `web/`                   | Redesigned React site, editor, styles, public assets, tests |
+| `frontend/`              | Existing static production frontend                         |
+| `backend/`               | Contact API, separate CMS, backend tests                    |
+| `infrastructure/`        | Existing stack and proposed CMS template                    |
+| `scripts/`, `e2e/`       | Local tooling, release checks, browser tests                |
+| `.github/`, `.githooks/` | CI/CD, PR checklist, optional local enforcement             |
+| `docs/`                  | Requirements, design, operations, shared agent rules        |
 
-## GitHub Actions deployment
-
-Configure these repository settings:
-
-| Type | Name | Purpose |
-|---|---|---|
-| Secret | `AWS_ROLE_ARN` | IAM role trusted by GitHub OIDC |
-| Secret | `NOTIFICATION_EMAIL` | SNS notification recipient |
-| Variable | `AWS_REGION` | Deployment region, defaults to `us-east-1` |
-| Variable | `SAM_STACK_NAME` | CloudFormation stack name, defaults to `portfolio-aws` |
-| SAM parameter | `PrimaryDomainName` | Primary hostname; defaults to `henry-tsao.com` |
-| SAM parameter | `CertificateArn` | Existing ACM certificate covering the primary hostname and www |
-
-`ALLOWED_ORIGIN` is derived from `PrimaryDomainName` in SAM. The deployment
-workflow no longer reads the old GitHub `ALLOWED_ORIGIN` variable.
-
-The deployment role should be restricted to this repository and production environment. Do not store AWS access keys in GitHub.
-
-## Data and security
-
-- Contact records expire after 90 days through DynamoDB TTL.
-- DynamoDB point-in-time recovery and encryption are enabled.
-- S3 public access is blocked; CloudFront reads through signed Origin Access Control requests.
-- API throttling and a honeypot reduce basic abuse. Add CAPTCHA or AWS WAF if traffic warrants it.
-- CloudWatch logs expire after 30 days.
-- The stack retains the S3 bucket and DynamoDB table when the stack is deleted to prevent accidental data loss.
-
-## Cost
-
-The system uses usage-based serverless services and should remain inexpensive at portfolio traffic levels. It is not strictly zero-cost: CloudFront requests and transfer, S3 storage, API calls, logs, and other usage can incur charges.
+Local assistant roles/skills, reports, `.env` variants, credentials, build outputs,
+and traces stay out of Git. Sanitized example files remain subject to secret
+scanning. Read [repository hygiene](docs/operations/repository-hygiene.md).
+Repository documents, source, tests, and UI use English; local completion reports
+use Traditional Chinese. Serverless usage, CI execution, and artifact storage may
+incur costs; this project is not guaranteed to be free or risk-free.

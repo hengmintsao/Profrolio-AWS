@@ -1,0 +1,45 @@
+{
+  "name": "henry-portfolio-workspace",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "check": "npm run check:tools && npm --prefix backend run check && npm --prefix web run build",
+    "test": "npm run test:tooling && npm --prefix backend test && npm --prefix web test -- --run",
+    "test:preview": "node scripts/preview-smoke.mjs",
+    "lint": "eslint . --max-warnings 0",
+    "format": "prettier --write web/src web/vite.config.ts web/tsconfig.json backend/src backend/test scripts e2e eslint.config.js playwright.config.ts package.json web/package.json backend/package.json .prettierrc.json .github/workflows tsconfig.tools.json .github/dependabot.yml README.md CONTRIBUTING.md AGENTS.md .github/pull_request_template.md",
+    "format:check": "prettier --check web/src web/vite.config.ts web/tsconfig.json backend/src backend/test scripts e2e eslint.config.js playwright.config.ts package.json web/package.json backend/package.json .prettierrc.json .github/workflows tsconfig.tools.json .github/dependabot.yml README.md CONTRIBUTING.md AGENTS.md .github/pull_request_template.md",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:report": "playwright show-report",
+    "quality": "npm run check:repository && npm run check:secrets && npm run check:release && npm run check:language && npm run lint && npm run format:check && npm run check && npm test && npm run test:e2e",
+    "audit:dependencies": "npm audit --audit-level=high && npm --prefix web audit --audit-level=high && npm --prefix backend audit --audit-level=high",
+    "check:tools": "tsc -p tsconfig.tools.json",
+    "check:language": "node scripts/check-language.mjs",
+    "test:tooling": "node --test scripts/test/*.test.mjs",
+    "check:release": "node scripts/check-release.mjs",
+    "check:repository": "node scripts/check-repository.mjs",
+    "check:secrets": "node scripts/scan-secrets.mjs",
+    "preflight": "node scripts/preflight.mjs",
+    "hooks:install": "node scripts/install-hooks.mjs"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.64.1",
+    "@types/node": "24.19.2",
+    "eslint": "10.13.0",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "17.13.0",
+    "prettier": "3.9.10",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.72.0",
+    "yaml": "2.9.1"
+  },
+  "engines": {
+    "node": ">=24.16.0 <25"
+  },
+  "version": "1.0.0"
+}

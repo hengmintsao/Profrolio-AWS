@@ -19,7 +19,11 @@ function response(statusCode, body) {
   };
 }
 
-export function createHandler({ storeContact, notifyContact, logError = console.error }) {
+export function createHandler({
+  storeContact,
+  notifyContact,
+  logError = console.error,
+}) {
   return async function handleContact(event) {
     let input;
 
@@ -38,14 +42,16 @@ export function createHandler({ storeContact, notifyContact, logError = console.
       id: crypto.randomUUID(),
       ...result.value,
       createdAt: new Date().toISOString(),
-      expiresAt: Math.floor(Date.now() / 1000) + (90 * 24 * 60 * 60),
+      expiresAt: Math.floor(Date.now() / 1000) + 90 * 24 * 60 * 60,
     };
 
     try {
       await storeContact(submission);
     } catch {
       logError('contact.storage_failed', { submissionId: submission.id });
-      return response(503, { message: 'Unable to accept message. Please try again later.' });
+      return response(503, {
+        message: 'Unable to accept message. Please try again later.',
+      });
     }
 
     try {
@@ -60,21 +66,28 @@ export function createHandler({ storeContact, notifyContact, logError = console.
 }
 
 export const handler = createHandler({
-  storeContact: (submission) => dynamodb.send(new PutCommand({
-    TableName: process.env.TABLE_NAME,
-    Item: submission,
-    ConditionExpression: 'attribute_not_exists(id)',
-  })),
+  storeContact: (submission) =>
+    dynamodb.send(
+      new PutCommand({
+        TableName: process.env.TABLE_NAME,
+        Item: submission,
+        ConditionExpression: 'attribute_not_exists(id)',
+      }),
+    ),
 
-  notifyContact: (submission) => sns.send(new PublishCommand({
-    TopicArn: process.env.TOPIC_ARN,
-    Subject: `Portfolio contact from ${submission.name}`.slice(0, 100),
-    Message: [
-      `Name: ${submission.name}`,
-      `Email: ${submission.email}`,
-      `Phone: ${submission.phone || 'Not provided'}`,
-      '',
-      submission.message || 'No message provided',
-    ].join('\n'),
-  }), { abortSignal: AbortSignal.timeout(2000) }),
+  notifyContact: (submission) =>
+    sns.send(
+      new PublishCommand({
+        TopicArn: process.env.TOPIC_ARN,
+        Subject: `Portfolio contact from ${submission.name}`.slice(0, 100),
+        Message: [
+          `Name: ${submission.name}`,
+          `Email: ${submission.email}`,
+          `Phone: ${submission.phone || 'Not provided'}`,
+          '',
+          submission.message || 'No message provided',
+        ].join('\n'),
+      }),
+      { abortSignal: AbortSignal.timeout(2000) },
+    ),
 });

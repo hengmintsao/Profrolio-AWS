@@ -3,9 +3,15 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 
-const template = readFileSync(new URL('../../infrastructure/template.yaml', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
-const code = template.split('      FunctionCode: !Sub |\n')[1].split('\n  FrontendDistribution:')[0]
-  .replace(/^        /gm, '').replaceAll('${PrimaryDomainName}', 'henry-tsao.com');
+const template = readFileSync(
+  new URL('../../infrastructure/template.yaml', import.meta.url),
+  'utf8',
+).replace(/\r\n/g, '\n');
+const code = template
+  .split('      FunctionCode: !Sub |\n')[1]
+  .split('\n  FrontendDistribution:')[0]
+  .replace(/^ {8}/gm, '')
+  .replaceAll('${PrimaryDomainName}', 'henry-tsao.com');
 const context = {};
 runInNewContext(code, context);
 
@@ -20,12 +26,17 @@ test('www redirects to the primary HTTPS hostname', () => {
 });
 
 test('redirect preserves path, encoded query values and repeated parameters', () => {
-  const result = context.handler({ request: request('www.henry-tsao.com', '/projects', {
-    source: { value: 'a%20b%26c' },
-    tag: { value: 'aws', multiValue: [{ value: 'aws' }, { value: 'web' }] },
-    empty: { value: '' },
-  }) });
-  assert.equal(result.headers.location.value, 'https://henry-tsao.com/projects?source=a%20b%26c&tag=aws&tag=web&empty=');
+  const result = context.handler({
+    request: request('www.henry-tsao.com', '/projects', {
+      source: { value: 'a%20b%26c' },
+      tag: { value: 'aws', multiValue: [{ value: 'aws' }, { value: 'web' }] },
+      empty: { value: '' },
+    }),
+  });
+  assert.equal(
+    result.headers.location.value,
+    'https://henry-tsao.com/projects?source=a%20b%26c&tag=aws&tag=web&empty=',
+  );
 });
 
 test('primary and CloudFront hostnames pass through without redirect loops', () => {

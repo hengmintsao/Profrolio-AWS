@@ -1,0 +1,12 @@
+node_modules/
+web/node_modules/
+backend/node_modules/
+web/dist/
+.aws-sam*/
+.scratch/
+coverage/
+test-results/
+playwright-report/
+package-lock.json
+**/package-lock.json
+docs/reports/
