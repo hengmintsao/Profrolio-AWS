@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Require a preexisting account-scoped CMS runtime permissions boundary in backend delivery and the execution-role template.
+- Keep text checkouts in LF format across platforms so Windows branch switches remain compatible with formatting checks.
+
 - Prepare separate CMS backend/cutover/recovery delivery with source-bound artifacts and reviewed change sets.
 - Keep legacy deployment from overwriting a CMS-mode site; add conditional SPA routing, exact-origin CSP and zero-minimum-TTL caching.
 - Document production owner enrollment, AWS configuration and live acceptance prerequisites; no CMS deployment is implied.

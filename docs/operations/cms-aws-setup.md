@@ -77,6 +77,41 @@ reviewed trust and permissions, plus narrowly scoped `iam:PassRole`; it is not
 silently configured by the current templates. Missing permissions remain a
 predeployment blocker until an administrator approves the exact proposal.
 
+## Required runtime permissions boundary
+
+`RuntimePermissionsBoundaryArn` is a required CMS template parameter with no
+default. The delivery workflow derives it from the validated `AWS_ACCOUNT_ID` as
+`arn:aws:iam::<account>:policy/PortfolioCmsRuntimeBoundary`; no additional GitHub
+variable is needed. Before planning or applying, its managed-policy metadata
+must exist in that exact account and report `IsAttachable=true`. A metadata check
+does not verify the policy document, its current version, or the effective
+permissions of a created role. Review the actual default policy version too.
+
+[`cms-runtime-boundary-policy.json`](../../infrastructure/cms-runtime-boundary-policy.json)
+is the reviewed example for account `412381749585`, Region `us-east-1`, stack
+`portfolio-cms-prod`. It is an independently administered maximum-permissions
+policy, not a grant: runtime access is the intersection with the role's existing
+inline policy. The DynamoDB table-name wildcard also covers indexes below those
+table ARNs; an explicit ListingIndex ARN would be redundant. Tighten generated
+resource IDs after bootstrap through a separately reviewed policy update.
+
+An authorized administrator must create the approved managed policy before the
+CMS stack is deployed. This template references the policy; it does not create
+or edit it. The GitHub deployment identity may read that exact policy's metadata
+with `iam:GetPolicy`, but must not create policy versions, alter/remove the
+boundary, or grant itself wider runtime rights. Its `iam:CreateRole` and
+`iam:PutRolePolicy` permissions must require the same `iam:PermissionsBoundary`
+ARN. `iam:PassRole` stays restricted to the CMS runtime role and Lambda service.
+Do not remove the boundary condition to work around an AccessDenied failure.
+
+The example fixes an IAM policy-escalation limit without changing application
+permissions, retention, data, MFA, or resource identities. It grants no deployment
+rights or permission to delete resources. Provider permission completeness,
+CloudFormation forwarding-context compatibility, and automatic-rollback cleanup
+remain separate prerequisites; withheld deletion rights can block cleanup and
+require an explicitly reviewed recovery plan. No AWS policy or role has been
+created merely by adding these source files.
+
 ## Bootstrap, owner enrollment, and cutover
 
 1. Verify the annotated release tag, source SHA, green exact-source CI, approved

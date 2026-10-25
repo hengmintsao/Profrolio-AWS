@@ -191,6 +191,10 @@ function fakeRunner(initial = false, mode = null) {
     StackName: mode ? env.SAM_STACK_NAME : env.CMS_STACK_NAME,
   };
   let backupRevision = 'original';
+  let boundaryPolicy = {
+    Arn: `arn:aws:iam::${env.AWS_ACCOUNT_ID}:policy/PortfolioCmsRuntimeBoundary`,
+    IsAttachable: true,
+  };
   const run = (binary, args) => {
     calls.push([binary, ...args]);
     if (binary === 'tar')
@@ -208,6 +212,11 @@ function fakeRunner(initial = false, mode = null) {
     const [service, operation] = args;
     if (service === 'sts')
       return JSON.stringify({ Account: env.AWS_ACCOUNT_ID });
+    if (service === 'iam' && operation === 'get-policy') {
+      if (!boundaryPolicy)
+        throw Error('NoSuchEntity: boundary policy is absent.');
+      return JSON.stringify({ Policy: boundaryPolicy });
+    }
     if (service === 's3api') {
       if (operation === 'get-bucket-location')
         return JSON.stringify({ LocationConstraint: null });
@@ -243,7 +252,12 @@ function fakeRunner(initial = false, mode = null) {
               'PrimaryDomainName',
               'NotificationEmail',
             ]
-          : ['PrimaryOrigin', 'CognitoDomainPrefix', 'ReleaseSourceSha']
+          : [
+              'PrimaryOrigin',
+              'CognitoDomainPrefix',
+              'ReleaseSourceSha',
+              'RuntimePermissionsBoundaryArn',
+            ]
         ).map((ParameterKey) => ({ ParameterKey })),
       });
     if (operation === 'create-change-set') {
@@ -273,6 +287,9 @@ function fakeRunner(initial = false, mode = null) {
     changeBackup: () => {
       backupRevision = 'external-change';
     },
+    setBoundary: (policy) => {
+      boundaryPolicy = policy;
+    },
   };
 }
 
@@ -281,6 +298,19 @@ test('backend plan and apply bind same-run validated inputs without executing re
   try {
     const fake = fakeRunner();
     const plan = await deliver('plan', env, fake.run, () => source);
+    assert.deepEqual(
+      JSON.parse(readFileSync('delivery-parameters.json', 'utf8')).find(
+        (entry) => entry.ParameterKey === 'RuntimePermissionsBoundaryArn',
+      ),
+      {
+        ParameterKey: 'RuntimePermissionsBoundaryArn',
+        ParameterValue: `arn:aws:iam::${env.AWS_ACCOUNT_ID}:policy/PortfolioCmsRuntimeBoundary`,
+      },
+    );
+    assert.equal(
+      plan.config.runtimeBoundaryArn,
+      `arn:aws:iam::${env.AWS_ACCOUNT_ID}:policy/PortfolioCmsRuntimeBoundary`,
+    );
     const PLAN_SHA256 = readFileSync('delivery-plan.sha256', 'utf8').trim();
     const result = await deliver(
       'apply',
@@ -308,6 +338,12 @@ test('initial backend CREATE accepts its reviewed placeholder without assuming o
     const fake = fakeRunner(true);
     const plan = await deliver('plan', env, fake.run, () => source);
     assert.equal(plan.changeSetType, 'CREATE');
+    assert.equal(
+      JSON.parse(readFileSync('delivery-parameters.json', 'utf8')).find(
+        (entry) => entry.ParameterKey === 'RuntimePermissionsBoundaryArn',
+      ).ParameterValue,
+      `arn:aws:iam::${env.AWS_ACCOUNT_ID}:policy/PortfolioCmsRuntimeBoundary`,
+    );
     const result = await deliver(
       'apply',
       {
@@ -367,6 +403,87 @@ test('artifact checksum and escaping members fail before AWS authentication', ()
     assert.throws(() => verifyArtifacts(() => '../escape\n'), /paths/);
     writeFileSync('deployment-inputs.tgz', 'tampered');
     assert.throws(() => verifyArtifacts(() => ''), /checksum/);
+  } finally {
+    cleanup();
+  }
+});
+
+test('backend boundary lookup fails closed before plan or apply writes when absent, mismatched or not attachable', async () => {
+  const expectedArn = `arn:aws:iam::${env.AWS_ACCOUNT_ID}:policy/PortfolioCmsRuntimeBoundary`;
+  for (const phase of ['plan', 'apply']) {
+    for (const policy of [
+      null,
+      {
+        Arn: expectedArn.replace(env.AWS_ACCOUNT_ID, '999999999999'),
+        IsAttachable: true,
+      },
+      { Arn: expectedArn, IsAttachable: false },
+      { Arn: expectedArn },
+    ]) {
+      const cleanup = fixture();
+      try {
+        const fake = fakeRunner();
+        const operationEnv = { ...env };
+        if (phase === 'apply') {
+          await deliver('plan', operationEnv, fake.run, () => source);
+          operationEnv.PLAN_SHA256 = readFileSync(
+            'delivery-plan.sha256',
+            'utf8',
+          ).trim();
+        }
+        fake.calls.length = 0;
+        fake.setBoundary(policy);
+        await assert.rejects(
+          deliver(phase, operationEnv, fake.run, () => source),
+          /boundary/,
+        );
+        assert.ok(
+          fake.calls.some(
+            (args) =>
+              args[1] === 'iam' &&
+              args[2] === 'get-policy' &&
+              args[4] === expectedArn,
+          ),
+        );
+        assert.equal(
+          fake.calls.some(
+            (args) =>
+              args[0] === 'sam' ||
+              ['create-change-set', 'execute-change-set'].includes(args[2]) ||
+              args[1] === 's3',
+          ),
+          false,
+          'A failed boundary prerequisite must not package, mutate CloudFormation or publish files.',
+        );
+      } finally {
+        cleanup();
+      }
+    }
+  }
+});
+
+test('backend verifies the caller account before reading the account-derived boundary', async () => {
+  const cleanup = fixture();
+  try {
+    const fake = fakeRunner();
+    const run = (binary, args) => {
+      if (binary === 'aws' && args[0] === 'sts')
+        return JSON.stringify({ Account: '999999999999' });
+      return fake.run(binary, args);
+    };
+    await assert.rejects(
+      deliver('plan', env, run, () => source),
+      /account mismatch/,
+    );
+    assert.equal(
+      fake.calls.some(
+        (args) =>
+          args[1] === 'iam' ||
+          args[0] === 'sam' ||
+          args[1] === 'cloudformation',
+      ),
+      false,
+    );
   } finally {
     cleanup();
   }
@@ -454,6 +571,11 @@ for (const mode of ['cutover', 'restore-legacy']) {
             args.includes('no-store') &&
             args.some((arg) => arg.startsWith('s3://website-assets/')),
         ),
+      );
+      assert.equal(
+        fake.calls.some((args) => args[1] === 'iam'),
+        false,
+        'Frontend-only operations do not require a runtime-boundary lookup.',
       );
       assert.ok(
         fake.calls.some(
