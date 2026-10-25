@@ -2,8 +2,8 @@
 
 ## Scope
 
-The workspace is preparing version 1.0.1; its tag has not been published.
-The existing v1.0.0 source release remains immutable. Neither source release
+The workspace is preparing version 1.0.2; its tag has not been published.
+The existing v1.0.0 and v1.0.1 source releases remain immutable. Neither source release
 publication nor version metadata establishes successful CMS deployment.
 The legacy deployment targets `frontend/` and the contact stack. The separate
 `deploy-cms.yml` workflow prepares CMS backend deployment, frontend cutover and
