@@ -53,7 +53,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ inputs.source_sha || github.sha }}
-      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1
         with:
           platforms: arm64
       - uses: aws-actions/setup-sam@f84ec7d548307efafe33230528756de3c5841a17
