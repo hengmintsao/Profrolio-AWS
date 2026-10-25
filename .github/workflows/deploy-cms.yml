@@ -17,6 +17,11 @@ on:
         required: false
         type: string
 
+      recover_change_set_arn:
+        description: Exact failed backend change-set ARN; only for untouched initial stack recovery
+        required: false
+        type: string
+
 permissions:
   contents: read
 
@@ -67,6 +72,7 @@ jobs:
       RELEASE_TAG: ${{ inputs.release_tag }}
       DELIVERY_OPERATION: ${{ inputs.operation }}
       LIVE_ACCEPTANCE_URL: ${{ inputs.live_acceptance_url }}
+      RECOVER_CHANGE_SET_ARN: ${{ inputs.recover_change_set_arn }}
       AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
       AWS_REGION: ${{ vars.AWS_REGION }}
       CMS_STACK_NAME: ${{ vars.CMS_STACK_NAME }}
@@ -131,6 +137,7 @@ jobs:
       RELEASE_TAG: ${{ inputs.release_tag }}
       DELIVERY_OPERATION: ${{ inputs.operation }}
       LIVE_ACCEPTANCE_URL: ${{ inputs.live_acceptance_url }}
+      RECOVER_CHANGE_SET_ARN: ${{ inputs.recover_change_set_arn }}
       AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
       AWS_REGION: ${{ vars.AWS_REGION }}
       CMS_STACK_NAME: ${{ vars.CMS_STACK_NAME }}
