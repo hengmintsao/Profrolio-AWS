@@ -1,0 +1,182 @@
+name: CMS production delivery
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing reviewed annotated vX.Y.Z tag reachable from main
+        required: true
+        type: string
+      operation:
+        description: Backend first; cutover only after live acceptance; restore leaves CMS data intact
+        required: true
+        type: choice
+        options: [backend, cutover, restore-legacy]
+      live_acceptance_url:
+        description: HTTPS acceptance evidence for this exact CMS source, required for cutover
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: portfolio-production
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      source_sha: ${{ steps.release.outputs.source_sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .nvmrc
+      - name: Resolve reviewed release
+        id: release
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: node scripts/resolve-release.mjs
+
+  checks:
+    needs: resolve
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/ci.yml
+    with:
+      source_sha: ${{ needs.resolve.outputs.source_sha }}
+
+  plan:
+    needs: [resolve, checks]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      plan_sha256: ${{ steps.plan.outputs.plan_sha256 }}
+    env:
+      SOURCE_SHA: ${{ needs.resolve.outputs.source_sha }}
+      RELEASE_TAG: ${{ inputs.release_tag }}
+      DELIVERY_OPERATION: ${{ inputs.operation }}
+      LIVE_ACCEPTANCE_URL: ${{ inputs.live_acceptance_url }}
+      AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      CMS_STACK_NAME: ${{ vars.CMS_STACK_NAME }}
+      SAM_STACK_NAME: ${{ vars.SAM_STACK_NAME }}
+      SAM_ARTIFACT_BUCKET: ${{ vars.SAM_ARTIFACT_BUCKET }}
+      COGNITO_DOMAIN_PREFIX: ${{ vars.COGNITO_DOMAIN_PREFIX }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ needs.resolve.outputs.source_sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .nvmrc
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: deployment-inputs-${{ needs.resolve.outputs.source_sha }}-${{ github.run_attempt }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: cms-backend-${{ needs.resolve.outputs.source_sha }}-${{ github.run_attempt }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: cms-web-${{ needs.resolve.outputs.source_sha }}-${{ github.run_attempt }}
+      - name: Verify validated inputs before AWS authentication
+        run: node scripts/cms-delivery.mjs verify
+      - name: Require explicit production configuration
+        env:
+          CMS_AWS_ROLE_ARN: ${{ secrets.CMS_AWS_ROLE_ARN }}
+        run: |
+          test -n "$CMS_AWS_ROLE_ARN" || { echo "::error::CMS_AWS_ROLE_ARN is required"; exit 1; }
+          node --input-type=module -e 'import { configuration } from "./scripts/cms-delivery.mjs"; configuration(process.env);'
+      - uses: aws-actions/setup-sam@f84ec7d548307efafe33230528756de3c5841a17
+      - uses: aws-actions/configure-aws-credentials@ff717079ee2060e4bcee96c4779b553acc87447c
+        with:
+          role-to-assume: ${{ secrets.CMS_AWS_ROLE_ARN }}
+          aws-region: us-east-1
+      - name: Package and create reviewed change set
+        id: plan
+        run: node scripts/cms-delivery.mjs plan
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: ${{ !cancelled() }}
+        with:
+          name: cms-plan-${{ needs.resolve.outputs.source_sha }}-${{ github.run_attempt }}
+          path: |
+            delivery-plan.json
+            delivery-plan.sha256
+            packaged-delivery.yaml
+          retention-days: 90
+          if-no-files-found: error
+
+  apply:
+    needs: [resolve, plan]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      SOURCE_SHA: ${{ needs.resolve.outputs.source_sha }}
+      RELEASE_TAG: ${{ inputs.release_tag }}
+      DELIVERY_OPERATION: ${{ inputs.operation }}
+      LIVE_ACCEPTANCE_URL: ${{ inputs.live_acceptance_url }}
+      AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      CMS_STACK_NAME: ${{ vars.CMS_STACK_NAME }}
+      SAM_STACK_NAME: ${{ vars.SAM_STACK_NAME }}
+      SAM_ARTIFACT_BUCKET: ${{ vars.SAM_ARTIFACT_BUCKET }}
+      COGNITO_DOMAIN_PREFIX: ${{ vars.COGNITO_DOMAIN_PREFIX }}
+      PLAN_SHA256: ${{ needs.plan.outputs.plan_sha256 }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ needs.resolve.outputs.source_sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .nvmrc
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: deployment-inputs-${{ needs.resolve.outputs.source_sha }}-${{ github.run_attempt }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: cms-backend-${{ needs.resolve.outputs.source_sha }}-${{ github.run_attempt }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: cms-web-${{ needs.resolve.outputs.source_sha }}-${{ github.run_attempt }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: cms-plan-${{ needs.resolve.outputs.source_sha }}-${{ github.run_attempt }}
+      - name: Verify validated inputs before AWS authentication
+        run: node scripts/cms-delivery.mjs verify
+      - name: Require explicit production configuration
+        env:
+          CMS_AWS_ROLE_ARN: ${{ secrets.CMS_AWS_ROLE_ARN }}
+        run: |
+          test -n "$CMS_AWS_ROLE_ARN" || { echo "::error::CMS_AWS_ROLE_ARN is required"; exit 1; }
+          node --input-type=module -e 'import { configuration } from "./scripts/cms-delivery.mjs"; configuration(process.env);'
+      - uses: aws-actions/setup-sam@f84ec7d548307efafe33230528756de3c5841a17
+      - uses: aws-actions/configure-aws-credentials@ff717079ee2060e4bcee96c4779b553acc87447c
+        with:
+          role-to-assume: ${{ secrets.CMS_AWS_ROLE_ARN }}
+          aws-region: us-east-1
+      - name: Revalidate and execute approved plan
+        run: node scripts/cms-delivery.mjs apply
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: ${{ always() }}
+        with:
+          name: cms-result-${{ needs.resolve.outputs.source_sha }}-${{ github.run_attempt }}
+          path: delivery-result.json
+          retention-days: 90
+          if-no-files-found: warn

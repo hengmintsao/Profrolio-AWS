@@ -48,6 +48,18 @@ jobs:
         working-directory: web
       - run: npm test -- --run
         working-directory: web
+      - name: Preserve validated CMS web build
+        run: |
+          tar -czf cms-web.tgz -C web/dist .
+          sha256sum cms-web.tgz > cms-web.sha256
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cms-web-${{ inputs.source_sha || github.sha }}-${{ github.run_attempt }}
+          path: |
+            cms-web.tgz
+            cms-web.sha256
+          if-no-files-found: error
+          retention-days: 90
   cms-infrastructure:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -61,6 +73,18 @@ jobs:
       - uses: aws-actions/setup-sam@f84ec7d548307efafe33230528756de3c5841a17
       - run: sam validate --lint --template-file infrastructure/cms-template.yaml
       - run: sam build --use-container --template-file infrastructure/cms-template.yaml --build-dir .aws-sam-cms/build
+      - name: Preserve validated CMS backend build
+        run: |
+          tar -czf cms-backend.tgz -C .aws-sam-cms/build .
+          sha256sum cms-backend.tgz > cms-backend.sha256
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cms-backend-${{ inputs.source_sha || github.sha }}-${{ github.run_attempt }}
+          path: |
+            cms-backend.tgz
+            cms-backend.sha256
+          if-no-files-found: error
+          retention-days: 90
   cms-preview-integration:
     runs-on: ubuntu-latest
     timeout-minutes: 20

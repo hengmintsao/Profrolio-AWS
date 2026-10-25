@@ -3,6 +3,23 @@ Transform: AWS::Serverless-2016-10-31
 Description: Serverless infrastructure for Hengmin Tsao's portfolio.
 
 Parameters:
+  FrontendMode:
+    Type: String
+    Default: legacy
+    AllowedValues: [legacy, cms]
+    Description: Explicitly opt into CMS SPA routing, cache control, and content security policy.
+  CmsApiOrigin:
+    Type: String
+    Default: ''
+    AllowedPattern: '(^$|https://[a-z0-9]+\.execute-api\.us-east-1\.amazonaws\.com)'
+  CmsAuthOrigin:
+    Type: String
+    Default: ''
+    AllowedPattern: '(^$|https://[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.auth\.us-east-1\.amazoncognito\.com)'
+  CmsMediaOrigin:
+    Type: String
+    Default: ''
+    AllowedPattern: '(^$|https://[a-z0-9][a-z0-9.-]+\.s3\.us-east-1\.amazonaws\.com)'
   PrimaryDomainName:
     Type: String
     Default: henry-tsao.com
@@ -18,7 +35,18 @@ Parameters:
     Default: ''
     Description: Optional email address to subscribe to contact notifications.
 
+Rules:
+  CmsOriginsRequired:
+    RuleCondition: !Equals [!Ref FrontendMode, cms]
+    Assertions:
+      - Assert: !And
+          - !Not [!Equals [!Ref CmsApiOrigin, '']]
+          - !Not [!Equals [!Ref CmsAuthOrigin, '']]
+          - !Not [!Equals [!Ref CmsMediaOrigin, '']]
+        AssertDescription: CMS mode requires the reviewed API, Cognito, and media origins.
+
 Conditions:
+  IsCmsFrontend: !Equals [!Ref FrontendMode, cms]
   HasNotificationEmail: !Not [!Equals [!Ref NotificationEmail, '']]
 
 Globals:
@@ -164,6 +192,11 @@ Resources:
       ResponseHeadersPolicyConfig:
         Name: !Sub ${AWS::StackName}-security-headers
         SecurityHeadersConfig:
+          ContentSecurityPolicy: !If
+            - IsCmsFrontend
+            - ContentSecurityPolicy: !Sub "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: ${CmsApiOrigin} ${CmsMediaOrigin}; connect-src 'self' https://${ContactApi}.execute-api.${AWS::Region}.${AWS::URLSuffix} ${CmsApiOrigin} ${CmsAuthOrigin} ${CmsMediaOrigin}; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self' ${CmsAuthOrigin}"
+              Override: true
+            - !Ref AWS::NoValue
           ContentTypeOptions:
             Override: true
           FrameOptions:
@@ -191,13 +224,21 @@ Resources:
         - Key: Project
           Value: portfolio-aws
       FunctionConfig:
-        Comment: Redirect www to the primary HTTPS domain while preserving path and query.
+        Comment: Preserve canonical redirects and explicitly allow CMS SPA routes.
         Runtime: cloudfront-js-2.0
       FunctionCode: !Sub |
         function handler(event) {
           var request = event.request;
           var primaryDomain = '${PrimaryDomainName}';
           if (request.headers.host.value.toLowerCase() !== 'www.' + primaryDomain) {
+            var uri = request.uri;
+            var safeMethod = request.method === 'GET' || request.method === 'HEAD';
+            var publicRoute = /^\/(?:about\/?|projects\/?|projects\/[a-z0-9]+(?:-[a-z0-9]+)*|experience\/airline-revenue|contact)?$/.test(uri);
+            if (uri.indexOf('/projects/') === 0 && uri.length > 90) publicRoute = false;
+            var adminRoute = /^\/admin\/(?:login|callback|projects|projects\/new|trash|projects\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}\/(?:edit|preview))$/.test(uri);
+            if ('${FrontendMode}' === 'cms' && safeMethod && (publicRoute || adminRoute)) {
+              request.uri = '/index.html';
+            }
             return request;
           }
           var query = [];
@@ -216,6 +257,21 @@ Resources:
             }
           };
         }
+
+  CmsFrontendCachePolicy:
+    Type: AWS::CloudFront::CachePolicy
+    Properties:
+      CachePolicyConfig:
+        Name: !Sub ${AWS::StackName}-cms-cache
+        MinTTL: 0
+        DefaultTTL: 0
+        MaxTTL: 31536000
+        ParametersInCacheKeyAndForwardedToOrigin:
+          EnableAcceptEncodingBrotli: true
+          EnableAcceptEncodingGzip: true
+          CookiesConfig: {CookieBehavior: none}
+          HeadersConfig: {HeaderBehavior: none}
+          QueryStringsConfig: {QueryStringBehavior: none}
 
   FrontendDistribution:
     Type: AWS::CloudFront::Distribution
@@ -243,7 +299,7 @@ Resources:
           Compress: true
           AllowedMethods: [GET, HEAD, OPTIONS]
           CachedMethods: [GET, HEAD, OPTIONS]
-          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+          CachePolicyId: !If [IsCmsFrontend, !Ref CmsFrontendCachePolicy, 658327ea-f89d-4fab-a63d-7e88639e58f6]
           ResponseHeadersPolicyId: !Ref FrontendResponseHeadersPolicy
           FunctionAssociations:
             - EventType: viewer-request

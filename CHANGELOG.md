@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Prepare separate CMS backend/cutover/recovery delivery with source-bound artifacts and reviewed change sets.
+- Keep legacy deployment from overwriting a CMS-mode site; add conditional SPA routing, exact-origin CSP and zero-minimum-TTL caching.
+- Document production owner enrollment, AWS configuration and live acceptance prerequisites; no CMS deployment is implied.
+
 - Candidate workspace version 1.0.0; no release tag has been published.
 - Portfolio CMS preview and engineering quality tooling.
 - Unified release-readiness gate and manual annotated-tag legacy deployment.

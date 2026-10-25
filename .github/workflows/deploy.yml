@@ -77,6 +77,8 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      - name: Refuse legacy deployment after CMS cutover
+        run: node scripts/guard-legacy-release.mjs
       - name: Verify release identity
         env:
           RELEASE_TAG: ${{ inputs.release_tag }}
