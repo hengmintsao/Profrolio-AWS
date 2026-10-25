@@ -2,6 +2,11 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: Isolated portfolio CMS; existing website stack remains unchanged.
 Parameters:
+  ReleaseSourceSha:
+    Type: String
+    Default: ''
+    AllowedPattern: '(^$|[0-9a-f]{40})'
+    Description: Reviewed release source commit; output provenance does not prove live acceptance.
   PrimaryOrigin:
     Type: String
     Default: https://henry-tsao.com
@@ -214,6 +219,8 @@ Resources:
             Method: ANY
       Tags: {Project: portfolio-cms}
 Outputs:
+  ReleaseSourceSha:
+    Value: !Ref ReleaseSourceSha
   ApiBaseUrl:
     Value: !Sub 'https://${CmsApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}'
   AuthDomain:

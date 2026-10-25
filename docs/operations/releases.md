@@ -3,10 +3,17 @@
 ## Scope
 
 The candidate workspace version is 1.0.0. It is not a published release.
-The deployment workflow still targets the legacy `frontend/` and contact stack.
-The React CMS is checked by CI but is not deployed by this workflow. Its AWS,
-authentication, media, migration, and cutover prerequisites remain in
-`portfolio-cms.md`.
+The legacy deployment targets `frontend/` and the contact stack. The separate
+`deploy-cms.yml` workflow prepares CMS backend deployment, frontend cutover and
+legacy frontend recovery. Neither source changes nor a merged PR prove production
+execution. Follow `cms-aws-setup.md` and `portfolio-cms.md` for AWS, authentication,
+media, live acceptance and cutover prerequisites.
+
+Both workflows share `portfolio-production` concurrency. The legacy workflow
+refuses a CMS-mode website; use the explicit recovery operation instead.
+Production environment review settings must be verified in GitHub: naming an
+environment in YAML does not configure reviewers. Planning uploads packaged SAM
+code and creates a change set, so even planning requires AWS-write authorization.
 
 ## Before a PR
 
@@ -47,6 +54,56 @@ Artifacts retain deployment inputs for 90 days, subject to repository limits.
 Runtime API configuration is injected after artifact verification using JSON
 serialization and an HTTPS URL check. The checksum detects corruption; it is
 not an independent signature against a compromised workflow.
+
+## CMS operation sequence
+
+Use `CMS production delivery` from `main` only after the reviewed workflow has
+been merged, an annotated version has been separately authorized and published,
+and the setup in `cms-aws-setup.md` has been verified. Select the existing tag;
+never substitute a branch name or move an existing tag to retry.
+
+1. Choose `backend` to provision or update only the separate CMS stack. Complete
+   the production review before planning; SAM packaging uploads code to the
+   configured artifact bucket and planning creates a CloudFormation change set.
+2. Review the retained plan artifact, exact source/account/Region/stack, resource
+   additions and modifications, and recovery material before approving execution.
+   Replacement, deletion, stale plans and mismatched identities must stop the run.
+   Configure actual required reviewers in GitHub; YAML alone cannot enforce them.
+3. An authorized operator enrolls the owner with MFA and verifies real backend
+   authorization and media behavior. Record sanitized evidence tied to the source,
+   account and stack. Never include passwords, tokens or private content. Owner
+   browser callback and final public-site checks remain pending until cutover;
+   pre-cutover evidence must explicitly distinguish these unfinished checks.
+4. Choose `cutover` at the same accepted backend source, supplying the live
+   acceptance reference. Review its separate website change set and previous
+   versioned frontend configuration. This updates the existing website stack
+   and publishes the validated React build; the contact stack's packaged Lambda
+   can also change. Preserve domain, certificate and notification parameters.
+5. Perform the complete production acceptance in `portfolio-cms.md`, including
+   owner login/callback, CRUD/privacy/media, primary/www, mobile/deep links,
+   existing contact storage and notification delivery. Record what was actually
+   observed. A supplied evidence URL is a human attestation, not automated proof.
+
+On a failed cutover, stop and inspect the retained attempt/plan, CloudFormation
+events, previous object version IDs and actual site state. CloudFormation changes
+and S3 publication are separate operations: a failure can leave a partial cutover.
+There is no automatic destructive rollback. After separate recovery authorization,
+`restore-legacy` deploys the selected compatible release's legacy frontend and
+matching website mode, while retaining CMS data, media and authentication.
+This is a fresh validated publication, not exact restoration of previous bytes;
+previous versioned objects and recorded parameters remain necessary for forensic
+or exact recovery. Preserve older assets; publication must not use `--delete`.
+
+This first delivery implementation stops on an empty/no-change CloudFormation
+change set. If infrastructure completed but publication failed, rerunning the
+same tag and operation can therefore stop before republishing. Inspect actual
+state and select a separately reviewed compatible recovery operation or corrective
+version; exact S3-version restoration requires its own authorized operator plan.
+Do not bypass the change-set guard or assume a generic retry finishes recovery.
+
+Changing source, target configuration, stack state or frontend version after
+planning requires a new plan. Artifact retention is bounded to 90 days and is not
+an independent backup strategy. Verify recovery material before it expires.
 
 ## Failure and recovery
 

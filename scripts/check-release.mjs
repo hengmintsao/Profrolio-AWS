@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { parse } from 'yaml';
 import { validateVersions } from './release-policy.mjs';
+import { validateDeliveryWorkflows } from './workflow-policy.mjs';
 
 const packages = ['', 'web/', 'backend/'].flatMap((prefix) => {
   const pkg = JSON.parse(readFileSync(`${prefix}package.json`, 'utf8'));
@@ -30,6 +31,7 @@ for (const workflow of Object.values(workflows)) {
 }
 const ci = workflows['ci.yml'];
 const deploy = workflows['deploy.yml'];
+validateDeliveryWorkflows(workflows);
 if (deploy.on.push || !deploy.on.workflow_dispatch?.inputs?.release_tag)
   throw new Error('Production releases must use manual version selection.');
 if (!ci.jobs['release-readiness'].needs.includes('application-checks'))

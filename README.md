@@ -75,8 +75,11 @@ observed check name; this repository cannot enforce that setting by itself.
 [Deployment](.github/workflows/deploy.yml) is manual from `main` and accepts an
 existing annotated `vX.Y.Z` tag with matching package/lock versions. It rechecks
 that source, verifies the same run's archived SAM build and legacy frontend,
-then deploys the existing stack and publishes `frontend/`. It does **not** deploy
-`web/dist/` or switch the CMS into production. Follow the
+then deploys the existing stack and publishes `frontend/`. A legacy guard blocks
+this path after CMS cutover. The separate [CMS delivery workflow](.github/workflows/deploy-cms.yml)
+prepares backend deployment, frontend cutover, and legacy frontend recovery through
+reviewable change sets. These are prepared capabilities, not evidence of an AWS
+deployment. Follow the
 [release and recovery runbook](docs/operations/releases.md); direct manual AWS
 commands are not the normal release path.
 
@@ -89,6 +92,8 @@ must be verified before a real release. Never store AWS access keys in Git.
 
 See [architecture](docs/architecture.md) for contact acceptance, retention, and
 known notification/idempotency follow-ups. See
+[CMS AWS setup](docs/operations/cms-aws-setup.md) for the additional production
+role, variables, operator enrollment, acceptance and recovery prerequisites. See
 [CMS operations](docs/operations/portfolio-cms.md) for authentication, media,
 data, cost, deployment, and cutover prerequisites.
 

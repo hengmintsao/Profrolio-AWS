@@ -176,9 +176,11 @@ The pipeline validates source/version, reruns full CI, verifies and deploys its
 same-run build artifact, and records the attempt. A source manifest is not proof
 of successful deployment. Artifacts expire and are not independent signatures.
 
-The current pipeline deploys only legacy `frontend/` and the contact stack.
-CMS cutover requires its separate operations prerequisites and authorization;
-passing CMS tests does not satisfy them.
+The legacy pipeline deploys `frontend/` and the contact stack, and refuses to
+overwrite a CMS-mode site. The separate CMS delivery workflow uses explicit
+backend, cutover, and legacy recovery operations with change-set review before
+execution. Follow `docs/operations/cms-aws-setup.md`; passing CMS tests does not
+satisfy its real AWS, owner enrollment, acceptance or authorization prerequisites.
 
 Exit: authorized version and target are unambiguous; required gates pass and
 production acceptance remains pending until observed.

@@ -3,10 +3,12 @@
 ## Status and ownership
 
 `infrastructure/cms-template.yaml` proposes a separate CMS stack. It does not
-modify the existing `portfolio-aws` website stack, contact endpoint, CloudFront,
-DNS or production deployment workflow. No new cloud resources have been created.
-The primary ran cfn-lint 1.58.0 successfully on both templates. This is static
-evidence; SAM/container builds, IAM execution and live integration remain untested.
+modify the existing `portfolio-aws` website stack until a separately authorized
+cutover operation. The delivery workflow and conditional website changes are
+prepared locally; no new cloud resources have been created by this task.
+The earlier merged source passed remote ARM64 SAM container checks. Modified
+templates and delivery code need fresh CI evidence; local lint and mocked tests
+do not establish IAM execution or live integration. See `cms-aws-setup.md`.
 
 ## Runtime configuration
 
@@ -79,7 +81,9 @@ website artifact bucket or its `aws s3 sync --delete` ownership scope.
 
 ## Frontend cutover and recovery
 
-The current deployment still publishes legacy `frontend/`. Before switching:
+The production site still uses legacy `frontend/`. The CMS delivery workflow
+provides a separate, explicit cutover operation; implementation is not a record
+of its execution. Before switching:
 
 1. Review `web/dist`, production config and compatible rollback artifact together.
 2. Configure explicit CloudFront route rewriting for application routes, including
