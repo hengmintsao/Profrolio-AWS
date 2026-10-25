@@ -168,6 +168,40 @@ If a change set replaces retained resources, stop and obtain a migration/recover
 decision instead of executing it. Real change sets and live recovery remain
 unverified until an authorized AWS run occurs.
 
+## Recover a failed initial backend plan
+
+Do not delete a `REVIEW_IN_PROGRESS` stack or move an existing release tag to
+recover from a failed plan. First inspect and correct the exact deployment-role
+permission failure, retaining the failed change set as evidence.
+
+For an explicitly authorized new backend plan, supply `recover_change_set_arn`
+with the full failed `cms-backend-<run>-<attempt>` ARN from the same account and
+Region. Leave it empty for normal bootstrap, updates, cutover and restoration.
+The workflow passes the input as `RECOVER_CHANGE_SET_ARN` to both plan and apply;
+it is bound into the reviewed manifest. A stable or absent stack rejects this
+recovery input, rather than silently ignoring it.
+
+Recovery accepts only an existing initial placeholder with no outputs, an exact
+matching failed/unavailable change set with no resource changes and a backend
+run description, and a nonempty, fully paginated event history containing only
+that stack's own `REVIEW_IN_PROGRESS` events. Missing evidence, authorization
+errors, resource activity, or a usable change set stops before SAM packaging.
+`cloudformation:DescribeStackEvents` is required on the exact CMS stack in
+addition to `DescribeChangeSet`; do not grant arbitrary stack access.
+
+The plan creates a fresh `CREATE` change set using the selected release and
+current run's validated artifacts. It neither deletes the stack/old change set
+nor executes either change set. Current-run artifacts, stack fingerprints,
+change content, configuration and source are still revalidated before apply.
+GitHub production concurrency and separate human environment gates remain
+required; these checks are not an atomic lock against external administrators.
+
+A fix to delivery code requires a reviewed new commit and release containing
+that code. Re-running an old immutable release executes its old delivery script
+and cannot acquire this fix. Do not approve apply until the new plan and actual
+AWS changes have been reviewed. Successful local fixtures do not establish
+actual OIDC permissions or real AWS recovery success.
+
 ## Primary AWS references
 
 - [SAM packaging and explicit artifact buckets](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-cli-command-reference-sam-package.html)

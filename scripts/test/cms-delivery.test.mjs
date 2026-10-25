@@ -287,6 +287,9 @@ function fakeRunner(initial = false, mode = null) {
     changeBackup: () => {
       backupRevision = 'external-change';
     },
+    setCms: (stack) => {
+      liveCms = stack;
+    },
     setBoundary: (policy) => {
       boundaryPolicy = policy;
     },
@@ -699,6 +702,224 @@ test('post-apply smoke rejects malformed backend data, stale HTML and missing-as
         JSON.parse(readFileSync('delivery-result.json', 'utf8')).status,
         'started',
         'A failed smoke must never claim a completed delivery.',
+      );
+    } finally {
+      cleanup();
+    }
+  }
+});
+
+const recoveryArn = `arn:aws:cloudformation:us-east-1:${env.AWS_ACCOUNT_ID}:changeSet/cms-backend-100-1/old-id`;
+function recoveryFixture(patch = {}, events = null) {
+  const fake = fakeRunner(true);
+  fake.setCms({ StackId: 'cms-id', StackStatus: 'REVIEW_IN_PROGRESS' });
+  const failed = {
+    ChangeSetId: recoveryArn,
+    ChangeSetName: 'cms-backend-100-1',
+    StackId: 'cms-id',
+    StackName: env.CMS_STACK_NAME,
+    Status: 'FAILED',
+    ExecutionStatus: 'UNAVAILABLE',
+    Changes: [],
+    Description: `backend ${source} run 100/1`,
+    ...patch,
+  };
+  const run = (binary, args) => {
+    if (
+      binary === 'aws' &&
+      args[1] === 'describe-change-set' &&
+      args.includes(recoveryArn)
+    ) {
+      fake.calls.push([binary, ...args]);
+      return JSON.stringify(failed);
+    }
+    if (binary === 'aws' && args[1] === 'describe-stack-events') {
+      fake.calls.push([binary, ...args]);
+      return JSON.stringify({
+        StackEvents: events ?? [
+          {
+            StackId: 'cms-id',
+            PhysicalResourceId: 'cms-id',
+            LogicalResourceId: env.CMS_STACK_NAME,
+            ResourceType: 'AWS::CloudFormation::Stack',
+            ResourceStatus: 'REVIEW_IN_PROGRESS',
+          },
+        ],
+      });
+    }
+    return fake.run(binary, args);
+  };
+  return { ...fake, run };
+}
+
+test('explicit failed initial plan recovery creates a new CREATE plan without deleting or executing', async () => {
+  const cleanup = fixture();
+  try {
+    const fake = recoveryFixture();
+    const plan = await deliver(
+      'plan',
+      { ...env, RECOVER_CHANGE_SET_ARN: recoveryArn },
+      fake.run,
+      () => source,
+    );
+    assert.equal(plan.changeSetType, 'CREATE');
+    const create = fake.calls.find((call) => call[2] === 'create-change-set');
+    assert.equal(create[create.indexOf('--change-set-type') + 1], 'CREATE');
+    assert.equal(
+      fake.calls.some((call) =>
+        ['delete-stack', 'delete-change-set', 'execute-change-set'].includes(
+          call[2],
+        ),
+      ),
+      false,
+    );
+    await deliver(
+      'apply',
+      {
+        ...env,
+        RECOVER_CHANGE_SET_ARN: recoveryArn,
+        PLAN_SHA256: readFileSync('delivery-plan.sha256', 'utf8').trim(),
+      },
+      fake.run,
+      () => source,
+      async () => ({ status: 200, text: async () => '{"items":[]}' }),
+    );
+  } finally {
+    cleanup();
+  }
+});
+
+test('placeholder recovery rejects missing consent, executable plans, foreign stacks and resource activity before packaging', async () => {
+  for (const [patch, events, consent] of [
+    [{}, null, ''],
+    [
+      { Status: 'CREATE_COMPLETE', ExecutionStatus: 'AVAILABLE' },
+      null,
+      recoveryArn,
+    ],
+    [{ StackId: 'foreign' }, null, recoveryArn],
+    [{ ChangeSetName: 'foreign' }, null, recoveryArn],
+    [{ NextToken: 'more-pages' }, null, recoveryArn],
+    [{ Changes: [{ ResourceChange: { Action: 'Add' } }] }, null, recoveryArn],
+    [{ Description: 'manual unrelated plan' }, null, recoveryArn],
+    [{}, [], recoveryArn],
+    [
+      {},
+      [
+        {
+          StackId: 'cms-id',
+          PhysicalResourceId: 'table',
+          ResourceType: 'AWS::DynamoDB::Table',
+          ResourceStatus: 'CREATE_COMPLETE',
+        },
+      ],
+      recoveryArn,
+    ],
+  ]) {
+    const cleanup = fixture();
+    try {
+      const fake = recoveryFixture(patch, events);
+      await assert.rejects(
+        deliver(
+          'plan',
+          { ...env, RECOVER_CHANGE_SET_ARN: consent },
+          fake.run,
+          () => source,
+        ),
+      );
+      assert.equal(
+        fake.calls.some(
+          (call) =>
+            call[0] === 'sam' ||
+            ['create-change-set', 'execute-change-set'].includes(call[2]),
+        ),
+        false,
+      );
+    } finally {
+      cleanup();
+    }
+  }
+});
+
+test('recovery input rejects foreign ARNs and non-backend operations before AWS calls', () => {
+  for (const patch of [
+    {
+      RECOVER_CHANGE_SET_ARN: recoveryArn.replace(
+        env.AWS_ACCOUNT_ID,
+        '999999999999',
+      ),
+    },
+    { RECOVER_CHANGE_SET_ARN: recoveryArn.replace('us-east-1', 'eu-west-1') },
+    { RECOVER_CHANGE_SET_ARN: 'cms-backend-100-1' },
+    {
+      RECOVER_CHANGE_SET_ARN: recoveryArn,
+      DELIVERY_OPERATION: 'restore-legacy',
+    },
+  ])
+    assert.throws(() => configuration({ ...env, ...patch }), /Recovery/);
+});
+
+test('recovery input cannot bypass normal absent or stable stack handling', async () => {
+  for (const initial of [true, false]) {
+    const cleanup = fixture();
+    try {
+      const fake = fakeRunner(initial);
+      await assert.rejects(
+        deliver(
+          'plan',
+          { ...env, RECOVER_CHANGE_SET_ARN: recoveryArn },
+          fake.run,
+          () => source,
+        ),
+        /placeholder/,
+      );
+      assert.equal(
+        fake.calls.some((call) => call[0] === 'sam'),
+        false,
+      );
+    } finally {
+      cleanup();
+    }
+  }
+});
+
+test('recovery rejects incomplete history, unreadable events and a placeholder changed during packaging', async () => {
+  for (const failure of ['pagination', 'access-denied', 'changed-stack']) {
+    const cleanup = fixture();
+    try {
+      const fake = recoveryFixture();
+      const run = (binary, args) => {
+        if (binary === 'aws' && args[1] === 'describe-stack-events') {
+          if (failure === 'access-denied')
+            throw Error('AccessDenied: fixture events');
+          if (failure === 'pagination')
+            return JSON.stringify({
+              ...JSON.parse(fake.run(binary, args)),
+              NextToken: 'unread-page',
+            });
+        }
+        const result = fake.run(binary, args);
+        if (binary === 'sam' && failure === 'changed-stack') fake.changeStack();
+        return result;
+      };
+      await assert.rejects(
+        deliver(
+          'plan',
+          { ...env, RECOVER_CHANGE_SET_ARN: recoveryArn },
+          run,
+          () => source,
+        ),
+        failure === 'pagination'
+          ? /history/
+          : failure === 'access-denied'
+            ? /AccessDenied/
+            : /changed during recovery/,
+      );
+      assert.equal(
+        fake.calls.some((call) =>
+          ['create-change-set', 'execute-change-set'].includes(call[2]),
+        ),
+        false,
       );
     } finally {
       cleanup();

@@ -23,6 +23,7 @@ export function configuration(env) {
     artifactBucket: env.SAM_ARTIFACT_BUCKET,
     domainPrefix: env.COGNITO_DOMAIN_PREFIX,
     acceptance: env.LIVE_ACCEPTANCE_URL || '',
+    recoveryChangeSet: env.RECOVER_CHANGE_SET_ARN || '',
     run: env.GITHUB_RUN_ID,
     attempt: env.GITHUB_RUN_ATTEMPT,
   };
@@ -47,6 +48,16 @@ export function configuration(env) {
     !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(value.domainPrefix || '')
   )
     throw Error('An explicit Cognito domain prefix is required.');
+  if (
+    value.recoveryChangeSet &&
+    (value.operation !== 'backend' ||
+      !new RegExp(
+        `^arn:aws:cloudformation:${value.region}:${value.account}:changeSet/cms-backend-[0-9]+-[0-9]+/[A-Za-z0-9-]+$`,
+      ).test(value.recoveryChangeSet))
+  )
+    throw Error(
+      'Recovery requires an exact account-scoped backend change-set ARN.',
+    );
   if (value.operation === 'cutover') {
     if (
       !/^https:\/\/github\.com\/hengmintsao\/Profrolio-AWS\/(?:issues|actions\/runs)\/\d+$/.test(
@@ -354,8 +365,61 @@ export async function deliver(
     });
   };
   if (phase === 'plan') {
+    if (config.recoveryChangeSet) {
+      if (!pendingCreate || cms.Outputs?.length)
+        throw Error('Recovery requires an untouched initial CMS placeholder.');
+      const failed = aws([
+        'cloudformation',
+        'describe-change-set',
+        '--stack-name',
+        target,
+        '--change-set-name',
+        config.recoveryChangeSet,
+      ]);
+      if (
+        failed.ChangeSetId !== config.recoveryChangeSet ||
+        failed.ChangeSetName !== config.recoveryChangeSet.split('/')[1] ||
+        failed.NextToken ||
+        failed.StackId !== cms.StackId ||
+        failed.StackName !== config.cmsStack ||
+        failed.Status !== 'FAILED' ||
+        failed.ExecutionStatus !== 'UNAVAILABLE' ||
+        !Array.isArray(failed.Changes) ||
+        failed.Changes.length !== 0 ||
+        !/^backend [a-f0-9]{40} run [0-9]+\/[0-9]+$/.test(
+          failed.Description || '',
+        )
+      )
+        throw Error(
+          'Recovery requires the exact failed, unexecuted backend change set.',
+        );
+      // AWS CLI automatically retrieves every page; never accept a partial history.
+      const history = aws([
+        'cloudformation',
+        'describe-stack-events',
+        '--stack-name',
+        target,
+      ]);
+      if (
+        history.NextToken ||
+        !Array.isArray(history.StackEvents) ||
+        !history.StackEvents.length ||
+        history.StackEvents.some(
+          (event) =>
+            event.StackId !== cms.StackId ||
+            event.PhysicalResourceId !== cms.StackId ||
+            event.LogicalResourceId !== config.cmsStack ||
+            event.ResourceType !== 'AWS::CloudFormation::Stack' ||
+            event.ResourceStatus !== 'REVIEW_IN_PROGRESS',
+        )
+      )
+        throw Error(
+          'Recovery requires a complete untouched placeholder event history.',
+        );
+    }
     if (
       cms &&
+      !(pendingCreate && config.recoveryChangeSet) &&
       ![
         'CREATE_COMPLETE',
         'UPDATE_COMPLETE',
@@ -363,7 +427,8 @@ export async function deliver(
       ].includes(cms.StackStatus)
     )
       throw Error('CMS stack must be stable.');
-    const previous = config.operation === 'backend' ? cms : website;
+    const previous =
+      config.operation === 'backend' ? (pendingCreate ? null : cms) : website;
     const backup = config.operation === 'backend' ? null : captureFrontend();
     const overrides =
       config.operation === 'backend'
@@ -411,6 +476,13 @@ export async function deliver(
     });
     writeFileSync('delivery-parameters.json', JSON.stringify(parameters));
     const name = `cms-${config.operation}-${config.run}-${config.attempt}`;
+    if (
+      config.recoveryChangeSet &&
+      stackFingerprint(describe(target)) !== stackFingerprint(cms)
+    )
+      throw Error(
+        'CMS placeholder changed during recovery; inspect before replanning.',
+      );
     const created = aws([
       'cloudformation',
       'create-change-set',

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Recover explicitly identified failed initial CMS plans without deleting the placeholder stack or executing unreviewed changes.
+
 - Require a preexisting account-scoped CMS runtime permissions boundary in backend delivery and the execution-role template.
 - Keep text checkouts in LF format across platforms so Windows branch switches remain compatible with formatting checks.
 
