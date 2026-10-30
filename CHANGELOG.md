@@ -2,7 +2,13 @@
 
 ## Unreleased
 
-## 1.0.3 (prepared; not published)
+## 1.0.4 (prepared; not published)
+
+- Build the legacy and CMS ARM64 SAM artifacts on native ARM64 CI runners, avoiding QEMU during dependency installation.
+- Preserve container validation, artifact checksums, required checks, and manual deployment approvals.
+- Synchronize package versions without dependency changes.
+
+## 1.0.3
 
 - Route CMS browser preflight requests without authentication while preserving JWT authorization on admin operations.
 - Require successful public and admin CORS preflight checks during backend delivery, in addition to the public projects contract check.

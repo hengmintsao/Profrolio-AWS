@@ -2,8 +2,8 @@
 
 ## Scope
 
-The workspace is preparing version 1.0.3; its tag has not been published.
-The existing v1.0.0, v1.0.1 and v1.0.2 source releases remain immutable. Neither source release
+The workspace is preparing version 1.0.4; its tag has not been published.
+The existing v1.0.0, v1.0.1, v1.0.2 and v1.0.3 source releases remain immutable. Neither source release
 publication nor version metadata establishes successful CMS deployment.
 The legacy deployment targets `frontend/` and the contact stack. The separate
 `deploy-cms.yml` workflow prepares CMS backend deployment, frontend cutover and
@@ -30,6 +30,12 @@ application checks, and exposes `release-readiness`. Configure that final job as
 a required check after GitHub has observed its actual check name. This local
 change does not update GitHub rulesets. Production environment reviewers and tag
 update/deletion protection must also be verified separately.
+
+The two SAM build jobs use `ubuntu-24.04-arm` to match the Lambda ARM64
+architecture without QEMU emulation. Container validation and same-run artifact
+checks remain required. Native runner execution must pass in GitHub CI; local
+Windows checks do not establish ARM64 build success. A failed published version
+keeps its immutable tag; workflow corrections require a reviewed new release.
 
 ## Release a reviewed version
 
