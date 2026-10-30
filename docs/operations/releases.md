@@ -2,8 +2,8 @@
 
 ## Scope
 
-The workspace is preparing version 1.0.2; its tag has not been published.
-The existing v1.0.0 and v1.0.1 source releases remain immutable. Neither source release
+The workspace is preparing version 1.0.3; its tag has not been published.
+The existing v1.0.0, v1.0.1 and v1.0.2 source releases remain immutable. Neither source release
 publication nor version metadata establishes successful CMS deployment.
 The legacy deployment targets `frontend/` and the contact stack. The separate
 `deploy-cms.yml` workflow prepares CMS backend deployment, frontend cutover and
@@ -83,6 +83,9 @@ never substitute a branch name or move an existing tag to retry.
    account and stack. Never include passwords, tokens or private content. Owner
    browser callback and final public-site checks remain pending until cutover;
    pre-cutover evidence must explicitly distinguish these unfinished checks.
+   Backend delivery also verifies unauthenticated browser preflight requests on
+   public and admin paths. SDK or CLI acceptance alone does not verify CORS:
+   an authenticated proxy route can reject a browser's token-free `OPTIONS` request.
 4. Choose `cutover` at the same accepted backend source, supplying the live
    acceptance reference. Review its separate website change set and previous
    versioned frontend configuration. This updates the existing website stack

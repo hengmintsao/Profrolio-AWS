@@ -296,6 +296,111 @@ function fakeRunner(initial = false, mode = null) {
   };
 }
 
+function healthyBackendRequest(url, options) {
+  return Promise.resolve({
+    status: options?.method === 'OPTIONS' ? 204 : 200,
+    headers: new Headers({
+      'access-control-allow-origin': 'https://portfolio.example',
+      'access-control-allow-methods': 'GET, POST, PUT, OPTIONS',
+      'access-control-allow-headers': 'Authorization, Content-Type',
+    }),
+    text: async () => '{"items":[]}',
+  });
+}
+
+test('backend smoke verifies browser preflight status and CORS on public and admin paths', async () => {
+  for (const path of ['/public/projects', '/admin/projects']) {
+    for (const failure of [
+      401,
+      404,
+      'origin',
+      'missing-origin',
+      'method',
+      'put',
+      'header',
+      'content-type',
+      null,
+    ]) {
+      const cleanup = fixture();
+      try {
+        const fake = fakeRunner();
+        await deliver('plan', env, fake.run, () => source);
+        const requests = [];
+        const request = async (url, options) => {
+          requests.push({ url, options });
+          const response = await healthyBackendRequest(url, options);
+          if (options.method === 'OPTIONS' && url.endsWith(path)) {
+            if (typeof failure === 'number') response.status = failure;
+            if (failure === 'origin')
+              response.headers.set('access-control-allow-origin', '*');
+            if (failure === 'missing-origin')
+              response.headers.delete('access-control-allow-origin');
+            if (failure === 'content-type')
+              response.headers.set(
+                'access-control-allow-headers',
+                'Authorization',
+              );
+            if (failure === 'put')
+              response.headers.set(
+                'access-control-allow-methods',
+                'GET, POST, OPTIONS',
+              );
+            if (failure === 'method')
+              response.headers.set('access-control-allow-methods', 'POST');
+            if (failure === 'header')
+              response.headers.set(
+                'access-control-allow-headers',
+                'Content-Type',
+              );
+          }
+          return response;
+        };
+        const apply = () =>
+          deliver(
+            'apply',
+            {
+              ...env,
+              PLAN_SHA256: readFileSync('delivery-plan.sha256', 'utf8').trim(),
+            },
+            fake.run,
+            () => source,
+            request,
+          );
+        if (failure !== null) {
+          await assert.rejects(apply, /Backend browser preflight/);
+          assert.equal(
+            readFileSync('delivery-result.json', 'utf8').includes(
+              'pipeline-complete',
+            ),
+            false,
+          );
+        } else {
+          const result = await apply();
+          assert.equal(result.preflightSmoke.length, 2);
+          for (const entry of requests.filter(
+            (entry) => entry.options.method === 'OPTIONS',
+          )) {
+            assert.equal(
+              entry.options.headers.Origin,
+              'https://portfolio.example',
+            );
+            assert.equal(
+              entry.options.headers['Access-Control-Request-Method'],
+              'GET',
+            );
+            assert.equal(
+              entry.options.headers['Access-Control-Request-Headers'],
+              'authorization,content-type',
+            );
+          }
+        }
+      } finally {
+        cleanup();
+      }
+    }
+  }
+});
+
 test('backend plan and apply bind same-run validated inputs without executing real AWS', async () => {
   const cleanup = fixture();
   try {
@@ -320,7 +425,7 @@ test('backend plan and apply bind same-run validated inputs without executing re
       { ...env, PLAN_SHA256 },
       fake.run,
       () => source,
-      async () => ({ status: 200, text: async () => '{"items":[]}' }),
+      healthyBackendRequest,
     );
     assert.equal(plan.target, env.CMS_STACK_NAME);
     assert.equal(result.status, 'pipeline-complete-live-acceptance-required');
@@ -355,7 +460,7 @@ test('initial backend CREATE accepts its reviewed placeholder without assuming o
       },
       fake.run,
       () => source,
-      async () => ({ status: 200, text: async () => '{"items":[]}' }),
+      healthyBackendRequest,
     );
     assert.equal(result.publicConfiguration.localDevelopment, false);
     assert.ok(
@@ -782,7 +887,7 @@ test('explicit failed initial plan recovery creates a new CREATE plan without de
       },
       fake.run,
       () => source,
-      async () => ({ status: 200, text: async () => '{"items":[]}' }),
+      healthyBackendRequest,
     );
   } finally {
     cleanup();

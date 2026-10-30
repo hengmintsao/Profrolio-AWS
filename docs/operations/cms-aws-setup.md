@@ -132,6 +132,12 @@ created merely by adding these source files.
    `https://henry-tsao.com/admin/login`, code flow with PKCE, no client secret,
    mandatory software-token MFA, and disabled public signup. Do not weaken MFA to
    bypass enrollment errors.
+   Verify token-free `OPTIONS /public/projects` and `OPTIONS /admin/projects`
+   with the primary Origin, requested method `GET`, and requested authorization
+   and content-type headers. Both must return a successful preflight with the
+   exact allowed origin, method and headers. Explicit preflight events override
+   the greedy proxy routes only for `OPTIONS`; admin data operations remain JWT
+   protected. A configured CORS origin alone does not prove browser access works.
 6. Verify the existing frontend bucket already has versioning enabled and current
    index/runtime-config objects have non-null version IDs. Planning refuses to
    proceed without these recovery prerequisites; it does not enable versioning
