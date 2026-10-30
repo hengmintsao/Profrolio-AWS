@@ -219,12 +219,26 @@ Resources:
             Path: /public/{proxy+}
             Method: ANY
             Auth: {Authorizer: NONE}
+        PublicPreflight:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref CmsApi
+            Path: /public/{proxy+}
+            Method: OPTIONS
+            Auth: {Authorizer: NONE}
         AdminRoutes:
           Type: HttpApi
           Properties:
             ApiId: !Ref CmsApi
             Path: /admin/{proxy+}
             Method: ANY
+        AdminPreflight:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref CmsApi
+            Path: /admin/{proxy+}
+            Method: OPTIONS
+            Auth: {Authorizer: NONE}
       Tags: {Project: portfolio-cms}
 Outputs:
   ReleaseSourceSha:

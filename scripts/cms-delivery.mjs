@@ -717,6 +717,45 @@ export async function deliver(
       status: response.status,
       contract: 'items-array',
     };
+    const origin = parameter(describe(config.cmsStack), 'PrimaryOrigin');
+    result.preflightSmoke = [];
+    for (const path of ['/public/projects', '/admin/projects']) {
+      const preflightUrl = new URL(path, url).href;
+      const preflight = await request(preflightUrl, {
+        method: 'OPTIONS',
+        headers: {
+          Origin: origin,
+          'Access-Control-Request-Method': 'GET',
+          'Access-Control-Request-Headers': 'authorization,content-type',
+        },
+        signal: AbortSignal.timeout(10000),
+        redirect: 'error',
+        cache: 'no-store',
+      });
+      const allows = (name, value) =>
+        (preflight.headers.get(name) || '')
+          .split(',')
+          .map((entry) => entry.trim().toLowerCase())
+          .includes(value);
+      if (
+        preflight.status < 200 ||
+        preflight.status >= 300 ||
+        preflight.headers.get('access-control-allow-origin') !== origin ||
+        !['get', 'post', 'put', 'options'].every((method) =>
+          allows('access-control-allow-methods', method),
+        ) ||
+        !allows('access-control-allow-headers', 'authorization') ||
+        !allows('access-control-allow-headers', 'content-type')
+      )
+        throw Error(`Backend browser preflight failed for ${path}.`);
+      result.preflightSmoke.push({
+        url: preflightUrl,
+        status: preflight.status,
+        origin,
+        method: 'GET',
+        headers: ['authorization', 'content-type'],
+      });
+    }
   } else {
     const origin = `https://${parameter(website, 'PrimaryDomainName')}`;
     const directory = config.operation === 'cutover' ? 'web/dist' : 'frontend';

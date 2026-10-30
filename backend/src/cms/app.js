@@ -108,6 +108,14 @@ export function createApp({
           fail(400, 'VALIDATION', 'Invalid JSON.');
         }
       }
+      if (method === 'OPTIONS') {
+        if (
+          parts.length >= 2 &&
+          (parts[0] === 'admin' || parts[0] === 'public')
+        )
+          return response(204);
+        fail(404, 'NOT_FOUND', 'Route unavailable.');
+      }
       const query = request.query || {};
       if (
         parts[0] === 'public' &&

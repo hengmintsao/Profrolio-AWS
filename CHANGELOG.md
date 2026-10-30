@@ -2,7 +2,13 @@
 
 ## Unreleased
 
-## 1.0.2 (prepared; not published)
+## 1.0.3 (prepared; not published)
+
+- Route CMS browser preflight requests without authentication while preserving JWT authorization on admin operations.
+- Require successful public and admin CORS preflight checks during backend delivery, in addition to the public projects contract check.
+- Synchronize workspace, web and backend patch versions without changing dependencies.
+
+## 1.0.2
 
 - Retain the CMS media bucket HTTPS enforcement policy with its retained bucket during rollback, deletion and replacement.
 
