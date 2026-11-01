@@ -37,7 +37,7 @@ jobs:
     outputs:
       source_sha: ${{ steps.release.outputs.source_sha }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
@@ -80,7 +80,7 @@ jobs:
       SAM_ARTIFACT_BUCKET: ${{ vars.SAM_ARTIFACT_BUCKET }}
       COGNITO_DOMAIN_PREFIX: ${{ vars.COGNITO_DOMAIN_PREFIX }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ needs.resolve.outputs.source_sha }}
           fetch-depth: 0
@@ -146,7 +146,7 @@ jobs:
       COGNITO_DOMAIN_PREFIX: ${{ vars.COGNITO_DOMAIN_PREFIX }}
       PLAN_SHA256: ${{ needs.plan.outputs.plan_sha256 }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ needs.resolve.outputs.source_sha }}
           fetch-depth: 0
