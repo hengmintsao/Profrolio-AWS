@@ -197,6 +197,9 @@ function ProjectCard({ project }: { project: PublicProject }) {
       >
         Read case study <span aria-hidden="true">→</span>
       </a>
+      <div className="project-live-link">
+        <External url={project.demoUrl}>Live project</External>
+      </div>
     </article>
   );
 }
@@ -215,7 +218,7 @@ function Projects({ state }: { state: ReturnType<typeof useProjects> }) {
           <h2 id="work-title">Projects, built with purpose.</h2>
           <p className="work-intro">
             Explore the projects below. Open a case study for the context,
-            decisions, and implementation, or visit the earlier live project.
+            decisions, and implementation, or follow its live project link.
           </p>
         </div>
       </div>
@@ -223,12 +226,11 @@ function Projects({ state }: { state: ReturnType<typeof useProjects> }) {
         <p role="status">Loading projects…</p>
       ) : error ? (
         <p className="notice" role="status">
-          {error} The earlier work below remains available.
+          {error}
         </p>
       ) : !shown.length ? (
         <p className="notice">
-          New case studies are on the way. Explore my earlier full-stack project
-          below.
+          Published projects will appear here when they are ready.
         </p>
       ) : (
         <div className="project-grid">
@@ -237,41 +239,6 @@ function Projects({ state }: { state: ReturnType<typeof useProjects> }) {
           ))}
         </div>
       )}
-      <article className="legacy-card">
-        <div>
-          <p className="eyebrow">EARLIER FULL-STACK WORK</p>
-          <h3>Airline-Point Website</h3>
-          <p>
-            A full-stack exploration of airline ticket costs and mileage
-            earning, built with React, Express, and MongoDB. This earlier
-            project is planned for a future rebuild.
-          </p>
-          <div className="chips">
-            <span>React</span>
-            <span>Express</span>
-            <span>MongoDB</span>
-            <span>Cypress</span>
-          </div>
-          <External url="https://airline-point-website.vercel.app">
-            Explore the earlier project
-          </External>
-        </div>
-        <a
-          className="legacy-preview"
-          href="https://airline-point-website.vercel.app/"
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="Open Airline-Point Website (new tab)"
-        >
-          <img
-            src="/airline-point-home.png"
-            alt="Airline-Point homepage with an airport background and welcome heading"
-            width={2523}
-            height={1407}
-            loading="lazy"
-          />
-        </a>
-      </article>
     </section>
   );
 }

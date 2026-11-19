@@ -2,8 +2,8 @@
 
 ## Scope
 
-The workspace is preparing version 1.0.4; its tag has not been published.
-The existing v1.0.0, v1.0.1, v1.0.2 and v1.0.3 source releases remain immutable. Neither source release
+The workspace is preparing version 1.0.5; its tag has not been published.
+The existing v1.0.0, v1.0.1, v1.0.2, v1.0.3 and v1.0.4 source releases remain immutable. Neither source release
 publication nor version metadata establishes successful CMS deployment.
 The legacy deployment targets `frontend/` and the contact stack. The separate
 `deploy-cms.yml` workflow prepares CMS backend deployment, frontend cutover and
@@ -64,6 +64,12 @@ serialization and an HTTPS URL check. The checksum detects corruption; it is
 not an independent signature against a compromised workflow.
 
 ## CMS operation sequence
+
+When removing the static Airline-Point card, follow
+[the Airline-Point import runbook](airline-point-import.md). Import and verify the
+private draft first, then coordinate publication and frontend cutover so the
+CMS-only homepage has a verified published project. A prepared migration file
+or a successful source build does not prove that live content was imported.
 
 Use `CMS production delivery` from `main` only after the reviewed workflow has
 been merged, an annotated version has been separately authorized and published,

@@ -107,6 +107,66 @@ describe('public layout revision', () => {
     ).toBe('/projects/published-work');
   });
 
+  it('renders Airline-Point once from published CMS content with managed media and links', async () => {
+    const project = {
+      ...emptyDraft(),
+      id: 'airline-project',
+      slug: 'airline-point-website',
+      title: 'Airline-Point Website',
+      summary: 'A CMS-managed airline project.',
+      revision: 2,
+      publishedAt: '2026-11-19',
+      coverMediaId: 'cms-cover',
+      coverAlt: 'Airline-Point managed cover',
+      demoUrl: 'https://airline-point-website.vercel.app/',
+      technologies: ['React', 'Express', 'MongoDB'],
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({ items: [project, project], nextCursor: null }),
+          ),
+      ),
+    );
+    render(<App />);
+    await settleRequests();
+    expect(
+      screen.getAllByRole('heading', { name: 'Airline-Point Website ↗' }),
+    ).toHaveLength(1);
+    expect(document.querySelectorAll('.project-card')).toHaveLength(1);
+    expect(
+      screen.getByRole('img', { name: project.coverAlt }).getAttribute('src'),
+    ).toBe('/api/public/projects/airline-point-website/media/cms-cover');
+    expect(
+      screen.getByRole('link', { name: 'Live project ↗' }).getAttribute('href'),
+    ).toBe(project.demoUrl);
+    expect(
+      screen.getByRole('link', { name: 'Live project ↗' }).getAttribute('rel'),
+    ).toBe('noopener noreferrer');
+    expect(
+      screen
+        .getByRole('link', { name: 'Read case study' })
+        .getAttribute('href'),
+    ).toBe('/projects/airline-point-website');
+    expect(document.querySelector('.legacy-card')).toBeNull();
+    expect(
+      document.querySelector('img[src="/airline-point-home.png"]'),
+    ).toBeNull();
+  });
+  it('does not recreate an unpublished project when the CMS collection is empty', async () => {
+    render(<App />);
+    await settleRequests();
+    expect(
+      screen.getByText(
+        'Published projects will appear here when they are ready.',
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText('Airline-Point Website')).toBeNull();
+    expect(document.querySelector('.project-card')).toBeNull();
+  });
+
   it('keeps About on the homepage and removes the requested hero labels', async () => {
     render(<App />);
     await settleRequests();
