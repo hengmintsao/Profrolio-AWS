@@ -2,7 +2,14 @@
 
 ## Unreleased
 
-## 1.0.4 (prepared; not published)
+## 1.0.5 (prepared; not published)
+
+- Render portfolio projects exclusively from published CMS records instead of a hardcoded Airline-Point card.
+- Prepare a resumable, draft-only migration of the earlier project and its existing cover through the normal CMS APIs.
+- Preserve owner editing, publication controls, and empty/error states without a static project fallback.
+- Synchronize package versions without dependency changes.
+
+## 1.0.4
 
 - Build the legacy and CMS ARM64 SAM artifacts on native ARM64 CI runners, avoiding QEMU during dependency installation.
 - Preserve container validation, artifact checksums, required checks, and manual deployment approvals.

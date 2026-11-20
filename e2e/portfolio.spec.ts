@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
@@ -7,9 +7,58 @@ const sharp = createRequire(
   new URL('../backend/package.json', import.meta.url),
 )('sharp');
 
+async function mockPublishedProject(page: Page) {
+  const project = {
+    id: 'isolated-airline-project',
+    slug: 'airline-point-website',
+    title: 'Airline-Point Website',
+    summary: 'Isolated CMS project fixture.',
+    revision: 2,
+    publishedAt: '2026-11-19T00:00:00Z',
+    coverMediaId: 'isolated-cover',
+    coverAlt: 'Airline-Point CMS cover fixture',
+    blocks: [{ type: 'paragraph', text: 'CMS-managed case study fixture.' }],
+    tags: ['Full-stack'],
+    technologies: ['React', 'Express', 'MongoDB'],
+    demoUrl: 'https://airline-point-website.vercel.app/',
+    repositoryUrl: '',
+    featured: true,
+    displayOrder: 0,
+  };
+  const image = await sharp({
+    create: { width: 4, height: 4, channels: 3, background: '#a44320' },
+  })
+    .png()
+    .toBuffer();
+  await page.route('**/api/public/projects', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ items: [project], nextCursor: null }),
+    }),
+  );
+  await page.route('**/api/public/projects/airline-point-website', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ project }),
+    }),
+  );
+  await page.route(
+    '**/api/public/projects/airline-point-website/media/isolated-cover',
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'image/png',
+        body: image,
+      }),
+  );
+}
+
 test.beforeEach(async ({ baseURL, page }) => {
   expect(baseURL).toBe('http://127.0.0.1:4174');
   await page.emulateMedia({ reducedMotion: 'reduce' });
+  await mockPublishedProject(page);
 });
 
 test('isolated preview enforces the configured host and origin', async ({
@@ -52,14 +101,29 @@ test('homepage images and section navigation work in a rendered browser', async 
         .evaluate((image: HTMLImageElement) => image.naturalWidth),
     )
     .toBeGreaterThan(0);
-  await page.locator('.legacy-preview').scrollIntoViewIfNeeded();
+  await page.locator('.project-image').scrollIntoViewIfNeeded();
+  await expect(page.locator('.project-card')).toHaveCount(1);
+  await expect(page.locator('.legacy-card')).toHaveCount(0);
+  await expect(
+    page.getByRole('link', { name: 'Live project ↗' }),
+  ).toHaveAttribute('href', 'https://airline-point-website.vercel.app/');
   await expect
     .poll(() =>
       page
-        .locator('.legacy-preview img')
+        .locator('.project-image img')
         .evaluate((image: HTMLImageElement) => image.naturalWidth),
     )
     .toBeGreaterThan(0);
+  await page
+    .getByRole('link', { name: 'Read case study', exact: true })
+    .click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+    'Airline-Point Website',
+  );
+  await expect(
+    page.getByRole('link', { name: 'Live project ↗' }),
+  ).toHaveAttribute('href', 'https://airline-point-website.vercel.app/');
+  await page.getByRole('link', { name: '← Back to work' }).click();
   if (isMobile) {
     await expect(
       page.getByRole('navigation', { name: 'Main navigation' }),
@@ -164,7 +228,7 @@ for (const path of [
   });
 }
 
-test('project service errors retain the earlier project entry', async ({
+test('project service errors do not recreate unpublished project content', async ({
   page,
 }) => {
   await page.route('**/api/public/projects', (route) =>
@@ -182,10 +246,10 @@ test('project service errors retain the earlier project entry', async ({
   );
   await expect(
     page.getByRole('heading', { name: 'Airline-Point Website' }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole('link', { name: 'Open Airline-Point Website (new tab)' }),
-  ).toHaveAttribute('href', 'https://airline-point-website.vercel.app/');
+  ).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Live project ↗' })).toHaveCount(
+    0,
+  );
 });
 
 test('isolated owner can upload, save, preview, publish, edit, trash and restore', async ({

@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "cover": {
+    "path": "web/public/airline-point-home.png",
+    "contentType": "image/png",
+    "size": 3463558,
+    "sha256": "166a30d12dd4d47ace271f9324b613a5586c1c23ba8936d6a02c4527472e041d"
+  },
+  "draft": {
+    "slug": "airline-point",
+    "title": "Airline-Point Website",
+    "summary": "A full-stack exploration of airline ticket costs and mileage earning, built with React, Express, and MongoDB. This earlier project is planned for a future rebuild.",
+    "coverMediaId": null,
+    "coverAlt": "Airline-Point homepage with an airport background and welcome heading",
+    "blocks": [
+      {
+        "type": "heading",
+        "text": "Earlier full-stack work"
+      },
+      {
+        "type": "paragraph",
+        "text": "A full-stack exploration of airline ticket costs and mileage earning, built with React, Express, and MongoDB."
+      },
+      {
+        "type": "paragraph",
+        "text": "This earlier project is planned for a future rebuild."
+      }
+    ],
+    "tags": ["Full-stack"],
+    "technologies": ["React", "Express", "MongoDB", "Cypress"],
+    "demoUrl": "https://airline-point-website.vercel.app/",
+    "repositoryUrl": "",
+    "featured": true,
+    "displayOrder": 0
+  }
+}

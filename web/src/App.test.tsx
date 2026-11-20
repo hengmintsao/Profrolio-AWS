@@ -65,12 +65,13 @@ describe('public project states', () => {
     await screen.findByText(/Project case studies are temporarily unavailable/);
     expect(
       screen.queryByText(
-        'Project case studies are being prepared for this new portfolio.',
+        'Published projects will appear here when they are ready.',
       ),
     ).toBeNull();
-    expect(screen.getByText('Airline-Point Website')).toBeTruthy();
+    expect(screen.queryByText('Airline-Point Website')).toBeNull();
+    expect(document.querySelector('.project-card')).toBeNull();
   });
-  it('renders public project records independently from earlier work', async () => {
+  it('renders public project records from the CMS', async () => {
     window.PORTFOLIO_CONFIG = { apiBase: '/api' };
     vi.stubGlobal(
       'fetch',
